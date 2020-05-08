@@ -24,7 +24,7 @@ pip install -e . --user
 ├── dataprep                          : a folder with code to read and prep data
 ├── surrogates                        : a folder contains surrogate model code
 ├── agents                            : a folder contains agent codes
-└── gym_accelerator                   : a folder containing the accelerator environments
+├── gym_accelerator                   : a folder containing the accelerator environments
 ├── cfg                               : a folder contains the agent and environment configuration
 ├── utils                             : a folder contains utilities
           
