@@ -52,26 +52,22 @@ class DQN:
         self.target_model = self._build_model()
 
         ## Save infomation ##
-        train_file_name = "dqn_mae_online_accelerator_%s_lr%s_v4.log" % str(self.learning_rate) 
+        train_file_name = "dqn_mae_online_accelerator_lr%s_v4.log" % str(self.learning_rate) 
         self.train_file = open(train_file_name, 'w')
         self.train_writer = csv.writer(self.train_file, delimiter = " ")
-
-    def _huber_loss(self, target, prediction):
-        error = prediction - target
-        return K.mean(K.sqrt(1+K.square(error))-1,axis=-1)
 
     def _build_model(self):
         ## Input: state ##       
         state_input = Input(self.env.observation_space.shape)
-        h1 = Dense(128, activation='relu')(state_input)
-        h2 = Dense(256, activation='relu')(h1)
+        h1 = Dense(56, activation='relu')(state_input)
+        h2 = Dense(56, activation='relu')(h1)
         h2 = GaussianNoise(0.1)(h2)
-        h3 = Dense(128, activation='relu')(h2)
+        h3 = Dense(56, activation='relu')(h2)
         ## Output: action ##   
-        output = Dense(self.env.action_space.n,activation='relu')(h3)
+        output = Dense(self.env.action_space.n,activation='linear')(h3)
         model = Model(input=state_input, output=output)
-        adam = Adam(lr=self.learning_rate)
-        model.compile(loss='mae', optimizer=adam)
+        adam = Adam(lr=self.learning_rate) ## clipvalue=0.5,clipnorm=1.0,)
+        model.compile(loss=tf.keras.losses.Huber(), optimizer=adam)
         return model       
 
     def remember(self, state, action, reward, next_state, done):
