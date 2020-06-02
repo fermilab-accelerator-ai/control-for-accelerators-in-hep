@@ -40,3 +40,9 @@ def reformat_dataset(filename):
     ## Compressed CSV
     df_merged.to_csv(filename+'_processed.csv.gz', compression='gzip')
     return status
+
+def load_data(filename):
+    df = pd.read_csv(filename)
+    df=df.replace([np.inf, -np.inf], np.nan)
+    df=df.dropna(axis=0)
+    return df
