@@ -52,22 +52,29 @@ class DQN:
         self.target_model = self._build_model()
 
         ## Save infomation ##
-        train_file_name = "dqn_mae_online_accelerator_lr%s_v4.log" % str(self.learning_rate) 
+        train_file_name = "dqn_huber_clipnorm=1_clipvalue05_online_accelerator_lr%s_v4.log" % str(self.learning_rate) 
         self.train_file = open(train_file_name, 'w')
         self.train_writer = csv.writer(self.train_file, delimiter = " ")
 
     def _build_model(self):
         ## Input: state ##       
         state_input = Input(self.env.observation_space.shape)
+        ## Make noisy input data ##
+        #state_input = GaussianNoise(0.1)(state_input)
+        ## Noisy layer 
         h1 = Dense(56, activation='relu')(state_input)
+        #h1 = GaussianNoise(0.1)(h1)
+        ## Noisy layer
         h2 = Dense(56, activation='relu')(h1)
-        h2 = GaussianNoise(0.1)(h2)
+        #h2 = GaussianNoise(0.1)(h2)
+        ## Output layer
         h3 = Dense(56, activation='relu')(h2)
         ## Output: action ##   
         output = Dense(self.env.action_space.n,activation='linear')(h3)
         model = Model(input=state_input, output=output)
-        adam = Adam(lr=self.learning_rate) ## clipvalue=0.5,clipnorm=1.0,)
+        adam = Adam(lr=self.learning_rate, clipnorm=1.0, clipvalue=0.5) ## clipvalue=0.5,clipnorm=1.0,)
         model.compile(loss=tf.keras.losses.Huber(), optimizer=adam)
+        model.summary()
         return model       
 
     def remember(self, state, action, reward, next_state, done):
