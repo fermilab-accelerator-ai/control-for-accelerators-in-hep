@@ -35,5 +35,8 @@ def reformat_dataset(filename):
 
     df_merged = reduce(lambda  left,right: pd.merge(left,right,on=['time'],
                         how='outer'), valid_dfs)
-    df_merged.to_csv(filename+'_processed.cvs')
+    ## Regular CSV
+    df_merged.to_csv(filename+'_processed.csv')
+    ## Compressed CSV
+    df_merged.to_csv(filename+'_processed.csv.gz', compression='gzip')
     return status
