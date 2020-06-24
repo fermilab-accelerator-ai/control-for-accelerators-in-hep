@@ -1,5 +1,3 @@
-import mpi4py.rc; mpi4py.rc.threads = False
-from mpi4py import MPI
 import random,sys,os
 import numpy as np
 from collections import deque
@@ -36,13 +34,6 @@ class DQN:
         self.individual_action_taken = np.ones(self.env.action_space.n)
 
         ##
-        world_comm = MPI.COMM_WORLD
-        world_rank = world_comm.rank
-        #if world_rank==0:
-        #    os.environ["CUDA_VISIBLE_DEVICES"]="3"
-        #else: 
-        #    os.environ["CUDA_VISIBLE_DEVICES"]=""
-        #
         os.environ["CUDA_VISIBLE_DEVICES"]=""
         tf_version = int((tf.__version__)[0])
         
@@ -72,25 +63,18 @@ class DQN:
         self.batch_size = int(data['batch_size']) if int(data['batch_size']) else 32
         self.target_train_interval =  50
         self.tau = float(data['tau']) if float(data['tau']) else 1.0
-        self.save_model = './model/'
+        self.save_model = './models/'
 
         self.model = self._build_model()
-        self.target_model = self._build_model()
-
-        ## Save infomation ##
-        train_file_name = "dqn_lstm_huber_clipnorm=1_clipvalue05_online_accelerator_lr%s_v4.log" % str(self.learning_rate) 
-        self.train_file = open(train_file_name, 'w')
-        self.train_writer = csv.writer(self.train_file, delimiter = " ")
+        self.target_model = self._build_model()    
 
     ##@profile
     def _build_model(self):
         model = Sequential()
         model.add(LSTM(56, return_sequences=True,input_shape=(1, self.env.observation_space.shape[0])))
         model.add(GaussianNoise(0.1))
-        #model.add(Dropout(0.2))
         model.add(LSTM(56, return_sequences=True))
         model.add(GaussianNoise(0.1))
-        #model.add(Dropout(0.2))
         model.add(LSTM(56))
         model.add(GaussianNoise(0.1))
         model.add(Dense(self.env.action_space.n,))
@@ -104,14 +88,12 @@ class DQN:
 
     def action(self, state):
         if np.random.rand() <= self.epsilon:
-            #logger.info('Random action')
             action = random.randrange(self.env.action_space.n)
             ## Update randomness
             if len(self.memory)>(self.batch_size):
                 self.epsilon_adj()
             return action, 0
         else:
-            #logger.info('NN action')
             np_state = np.array(state).reshape(1,1,len(state))
             act_values = self.target_model.predict(np_state)
             action = np.argmax(act_values[0])
@@ -125,7 +107,7 @@ class DQN:
         if len(self.memory)<(self.batch_size):
             return
 
-        #logger.info('### TRAINING MODEL ###')
+        logger.info('### TRAINING MODEL ###')
         losses = []
         minibatch = random.sample(self.memory, self.batch_size)
 
@@ -141,41 +123,7 @@ class DQN:
             history = self.model.fit(np_state, target_f, epochs = 1, verbose = 0)
             losses.append(history.history['loss'])
         self.target_train()
-        self.train_writer.writerow([np.mean(losses)])
-        self.train_file.flush()
-        
-        #batch_states = []
-        #batch_target = []
-
-        #for state, action, reward, next_state, done in minibatch:
-        #    #
-        #
-        #    np_state = np.array(state).reshape(1,len(state))
-        #    np_next_state = np.array(next_state).reshape(1,len(next_state))
-        #    expectedQ =0 
-        #    #if not done:
-        #    #    expectedQ = self.gamma*np.amax(self.target_model.predict(np_next_state)[0])
-        #    target = reward + expectedQ
-        #    target_f = self.target_model.predict(np_state)
-        #    target_f[0][action] = target
-        #    
-        #    #if batch_states==[]:
-        #    #    batch_states=np_state
-        #    #    batch_target=target_f
-        #    #else:
-        #    #    batch_states=np.append(batch_states,np_state,axis=0)
-        #    #    batch_target=np.append(batch_target,target_f,axis=0)
-        #        
-        #history = self.model.fit(batch_states, batch_target, epochs = 1, verbose = 0)
-        #losses.append(history.history['loss'][0])
-        #self.train_writer.writerow([np.mean(losses)])
-        #self.train_file.flush()
-        
-        #if self.target_train_counter%self.target_train_interval == 0:
-        #    #logger.info('### TRAINING TARGET MODEL ###')
-        #    self.target_train()
-            
-        return 0#np.mean(losses)
+        return 0
 
     def target_train(self):
         self.target_train_counter = 0
