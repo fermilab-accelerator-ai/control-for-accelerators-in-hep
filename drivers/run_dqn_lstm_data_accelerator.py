@@ -33,7 +33,7 @@ if __name__ == "__main__":
     #################
     ## Setup agent ##
     #################
-    agent = DQN(env)
+    agent = DQN(env,cfg='../cfg/dqn_setup.json')
     ## Save infomation ##
     train_file_s = open("data_accelerator_lstm_episode%s_steps%s_batched_memories_0602420_v1.log" % (str(EPISODES),str(NSTEPS)), 'w')
     train_writer_s = csv.writer(train_file_s, delimiter = " ")   
