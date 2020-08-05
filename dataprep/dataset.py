@@ -28,6 +28,8 @@ def reformat_data(filename, data_type='h5'):
     valid_keys = []
     for i,key in enumerate(h5_keys):
         df = pd.read_hdf(filename,key)
+        df = df.replace([np.inf, -np.inf], np.nan)
+        df = df.dropna(axis=0)
         df_new          = pd.DataFrame()
         df_new['time']  = pd.to_datetime(df.utc_seconds,unit='s')
         df_new[key]     = pd.to_numeric(df.value)
@@ -41,6 +43,10 @@ def reformat_data(filename, data_type='h5'):
     print('valid_keys',valid_keys)
 
     df_merged = reduce(lambda  left,right: pd.merge(left,right,on=['time'],how='outer'), valid_dfs)
+    df_merged = df_merged.replace([np.inf, -np.inf], np.nan)
+    df_merged = df_merged.dropna(axis=0)
+    df_merged = df_merged.reset_index().set_index('time').resample('66ms').mean()
+
     if data_type=='h5':
         df_merged.to_hdf(filename+'_processed.h5', 'ACNET')
 
