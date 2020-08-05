@@ -1,14 +1,35 @@
 import random, gym
 from gym import spaces
+from gym.spaces.space import Space
 from gym.utils import seeding
 import numpy as np
+import pandas as pd
+np.seterr(divide='ignore', invalid='ignore')
 
-class emulator(gym.Env):
-  def __init__(self,df):
-    self.df = df
+class Incremental(Space):
+    def __init__(self, low, high, inc, **kwargs):
+        num = int((stop-start)/inc+1)
+        self.values = np.linspace(start, stop, num, **kwargs)
+        super().__init__(self.values.shape, self.values.dtype)
+        self.n = len(self.values)
+
+    def sample(self):
+        return np.random.choice(self.values)
+
+    def contains(self, x):
+        return x in self.values
+        
+class Emulator_Accelerator(gym.Env):
+  def __init__(self,df=None):
+    if df==None:
+      self.df = self.load_data()
+    else:
+      self.df = df
+      
+    print(self.df)
     
-    self.min_BIMIN = 103
-    self.max_BIMIN = 104
+    self.min_BIMIN = 103.3
+    self.max_BIMIN = 103.4
     self.max_IMINER = 1
     
     self.low_state = np.array(
@@ -26,6 +47,7 @@ class emulator(gym.Env):
       dtype = np.float32
     )
     
+    '''
     self.action_space = spaces.Box(
       low   = self.min_BIMIN,
       high  = self.max_BIMIN,
@@ -33,11 +55,33 @@ class emulator(gym.Env):
       dtype = np.float32
     )
     
+    self.action_space = spaces.Incremental(
+      low   = self.min_BIMIN,
+      high  = self.max_BIMIN,
+      inc   = 0.001,
+      shape = (1,),
+      dtype = np.float32
+    )
+    '''
+    
+    self.actionMap_VIMIN = [0, 0.0001, 0.001,  0.01, -0.0001,-0.001, -0.01]
+    self.action_space = spaces.Discrete(7)
+    
     #print(df)
     self.state = [self.df["B:IMINER"][0]]
+    self.reset()
     #print("end of init-->state:", self.state)
     #self.state = self.reset(self.df)
     #print(self.state)
+    
+  def load_data(self,filename=None,starting=0):
+    if filename==None:
+      filename='./data/MLParamData_1583906408.4261804_From_MLrn_2020-03-10+00_00_00_to_2020-03-11+00_00_00.h5_processed.csv.gz'
+    df = pd.read_csv(filename)
+    df = df.replace([np.inf, -np.inf], np.nan)
+    df=df.dropna(axis=0)
+    df=df[starting:starting+5000]
+    return df
     
   def seed(self, seed=None):
     self.np_random, seed = seeding.np_random(seed)
@@ -51,7 +95,9 @@ class emulator(gym.Env):
     return y+r
   
   def step(self,action):
-    self.err = self.predict(action)
+    delta_VIMIN = self.actionMap_VIMIN[action]
+    self.VIMIN += delta_VIMIN
+    self.err = self.predict(self.VIMIN)
     #print("step-->error: ",self.err)
     #print("error>max_IMINER: ", self.err, self.max_IMINER)
     self.done = bool(
@@ -63,19 +109,25 @@ class emulator(gym.Env):
       self.reward = -10
     self.reward = -abs(self.err)
     
-    print("step-->action/reward: ",action,self.reward)
+    #print("step-->action/reward: ",action,self.reward)
     self.state = np.array([self.err])
+    #print("step-->state/action/reward: ",self.state,action,self.reward)
     #print("end of step-->\n")
     return self.state, self.reward, self.done, {}
   
-  def reset(self,df):
+  def reset(self,df=None):
+    if df == None:
+      df=self.df
+    else:
+      self.df = df
     self.seed()
-    self.df = df
     self.df = self._prepData(self.df)
     init = self.np_random.uniform(low=self.min_BIMIN, high=self.max_BIMIN) #random init. control
     #print ('reset-->init: random action:',init)
     self.err = self.predict(init)
     self.state = np.array([self.err])
+    self.VIMIN = init
+    return self.state
     #print('end of reset-->state:',self.state)
     
   def _prepData(self,df):
@@ -111,6 +163,7 @@ class emulator(gym.Env):
     #filter according to x-axis:
     y_std = df[df["B:VIMIN"].between(x-sampling_window,x+sampling_window)]
     #y_std = y_std[y_std["B:IMINER"].between(error-error_window,error+error_window)]
+    if y_std.empty: return 0
     
     # get the y-axis noise value according to the x-axis filtering
     hist, bins = np.histogram(y_std["IMINER_std"], bins=nbins)

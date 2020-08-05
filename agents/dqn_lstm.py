@@ -1,11 +1,15 @@
 import random,sys,os
 import numpy as np
 from collections import deque
-from keras.models import Sequential,Model
-from keras.layers import Dense,Dropout,Input,GaussianNoise,BatchNormalization,LSTM
-from keras.optimizers import Adam
-from keras import backend as K
+import tensorflow as tf
+print("tf version ==> ",tf.__version__)
+from tensorflow import keras
+from tensorflow.keras.models import Sequential,Model
+from tensorflow.keras.layers import Dense,Dropout,Input,GaussianNoise,BatchNormalization,LSTM
+from tensorflow.keras.optimizers import Adam
+from tensorflow.keras import backend as K
 import csv,json,math
+
 
 os.environ['TF_CPP_MIN_LOG_LEVEL'] = '3'
 # 0 = all messages are logged (default behavior)
@@ -13,9 +17,10 @@ os.environ['TF_CPP_MIN_LOG_LEVEL'] = '3'
 # 2 = INFO and WARNING messages are not printed
 # 3 = INFO, WARNING, and ERROR messages are not printed
 
-import tensorflow as tf
-import keras as keras
-from keras.backend.tensorflow_backend import set_session
+
+
+#from keras.backend.tensorflow_backend import set_session
+
 
 import logging
 logging.basicConfig(format='%(asctime)s - %(levelname)s - %(message)s')
@@ -44,6 +49,7 @@ class DQN:
             sess = tf.Session(config=config)
             set_session(sess)
         elif tf_version >= 2:
+            print("tf >2")
             config = tf.compat.v1.ConfigProto()
             config.gpu_options.allow_growth = True
             sess = tf.compat.v1.Session(config=config)
@@ -68,7 +74,6 @@ class DQN:
         self.model = self._build_model()
         self.target_model = self._build_model()    
 
-    ##@profile
     def _build_model(self):
         model = Sequential()
         model.add(LSTM(56, return_sequences=True,input_shape=(1, self.env.observation_space.shape[0])))
@@ -112,6 +117,7 @@ class DQN:
         minibatch = random.sample(self.memory, self.batch_size)
 
         for state, action, reward, next_state, done in minibatch:
+            #print ("minibatch state:",state)
             np_state = np.array(state).reshape(1,1,len(state))
             np_next_state = np.array(next_state).reshape(1,1,len(next_state))
             expectedQ =0
@@ -139,6 +145,7 @@ class DQN:
 
     def load(self, name):
         self.model.load_weights(name)
+        self.target_model.load_weights(name)
 
     def save(self, name):
         abspath = os.path.abspath(self.save_model + name)
@@ -150,6 +157,6 @@ class DQN:
         with open(model_json_name, 'w') as json_file:
             json_file.write(json_config)
         # Save weights to disk
-        self.model.save_weights(self.save_model + name+'.weights.h5')
-        self.model.save(self.save_model + name+'.modelall.h5')
+        self.target_model.save_weights(self.save_model + name+'.weights.h5')
+        self.target_model.save(self.save_model + name+'.modelall.h5')
         #logger.info('### SAVING MODEL '+abspath+'###')
