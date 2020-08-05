@@ -39,7 +39,6 @@ class DQN:
         self.individual_action_taken = np.ones(self.env.action_space.n)
 
         ##
-        os.environ["CUDA_VISIBLE_DEVICES"]=""
         tf_version = int((tf.__version__)[0])
         
         if tf_version < 2:
