@@ -4,11 +4,10 @@ from keras.models import Sequential
 
 
 class DataGenerator(Sequential):
-    def __init__(self, filename, variables=['B:VIMIN','B:IMINER','I:MDAT40','I:IB'], backward=200, forward=30, batch_size=32, nblocks=10):
+    def __init__(self, filename, variables=['B:VIMIN','B:IMINER','I:MDAT40','I:IB'], backward=200, forward=30, batch_size=32):
 
         ##
         self.batch_size = batch_size
-        self.nblocks = nblocks
         self.variables = variables
         self.backward = backward
         self.forward = forward
@@ -34,8 +33,6 @@ class DataGenerator(Sequential):
             ## Loop over the data to make a batch
             ## TODO: Need to make a block to allow pre-fetching
             ## Shape is number of traces, number time steps, number of variables
-            batch_x = np.empty(shape=(self.batch_size,self.backward,len(self.indices)))
-            batch_y = np.empty(shape=(self.batch_size,self.forward,len(self.indices)))
             list_x, list_y = [],[]
             for b in range(self.batch_size):
                 ## Check if idx is within the available data if not wrap back to the beginning
@@ -72,5 +69,5 @@ def main():
     print(batch_y.shape)
     return 0
 
-if __name__ == "__main__":
-    main()
+#if __name__ == "__main__":
+#    main()
