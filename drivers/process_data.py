@@ -1,5 +1,5 @@
 import dataprep.dataset as dataset
 
-filename = '/data/fermilab-accelerator-ai/MLParamData_1583906408.4261804_From_MLrn_2020-03-10+00_00_00_to_2020-03-11+00_00_00.h5'
+filename = '/Users/schr476/PycharmProjects/control-for-accelerators-in-hep/data/MLParamData_1575356421.3855522_From_MLrn_2019-12-02+00:00:00_to_2019-12-03+00:00:00.h5'
 
-print(dataset.reformat_dataset(filename))
+print(dataset.reformat_data(filename))
