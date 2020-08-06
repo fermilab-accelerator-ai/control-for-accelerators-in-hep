@@ -8,7 +8,7 @@ class DataGenerator(Sequential):
 
         ##
         self.batch_size = batch_size
-        self.variables = variables
+        self.in_variables = variables
         self.backward = backward
         self.forward = forward
         self.idx = 0
@@ -20,9 +20,9 @@ class DataGenerator(Sequential):
         self.nvars = self.hf['ACNET/block0_values'].shape[1]
         self.h5_variables = (self.hf['ACNET/block0_items'].value.astype(str))
         self.indices = []
-        for var in self.variables:
+        for var in self.in_variables:
             self.indices.append(np.where(self.h5_variables == var))
-        if len(self.indices)!=len(self.variables):
+        if len(self.indices)!=len(self.in_variables):
             print('Not all variables are available.')
 
     def generate(self):
