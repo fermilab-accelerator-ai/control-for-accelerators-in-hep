@@ -20,7 +20,7 @@ def reformat_data(filename, data_type='h5'):
     # Find keys ##
     f = h5py.File(filename, 'r')
     h5_keys = list(f.keys())
-    print('keys:'.format(h5_keys))
+    print('keys:{}'.format(h5_keys))
     print(len(h5_keys))
 
     ## Read data and reformat ##
@@ -43,9 +43,9 @@ def reformat_data(filename, data_type='h5'):
     print('valid_keys',valid_keys)
 
     df_merged = reduce(lambda  left,right: pd.merge(left,right,on=['time'],how='outer'), valid_dfs)
+    df_merged = df_merged.reset_index().set_index('time').resample('66ms').mean()
     df_merged = df_merged.replace([np.inf, -np.inf], np.nan)
     df_merged = df_merged.dropna(axis=0)
-    df_merged = df_merged.reset_index().set_index('time').resample('66ms').mean()
 
     if data_type=='h5':
         df_merged.to_hdf(filename+'_processed.h5', 'ACNET')

@@ -4,7 +4,7 @@ from keras.models import Sequential
 
 
 class DataGenerator(Sequential):
-    def __init__(self, filename, variables=['B:VIMIN','B:IMINER','I:MDAT40','I:IB','B:LINFRQ'], backward=200, forward=30, batch_size=32):
+    def __init__(self, filename, variables=['B:VIMIN','B:IMINER','I:MDAT40','I:IB','B:LINFRQ'], backward=200, forward=1, batch_size=32):
 
         ##
         self.batch_size = batch_size
@@ -55,6 +55,8 @@ class DataGenerator(Sequential):
 
             batch_x = np.stack(list_x,0)
             batch_y = np.stack(list_y,0)
+            ## Reshape
+            batch_y = batch_y.reshape(batch_y.shape[0], batch_y.shape[2])
             yield batch_x,batch_y
 
 def main():
