@@ -5,7 +5,7 @@ from keras.models import Sequential
 
 class DataGenerator(Sequential):
     def __init__(self, filename, variables=['B:VIMIN','B:IMINER','I:MDAT40','I:IB','B:LINFRQ'], backward=200, forward=1, batch_size=32):
-
+        super(DataGenerator, self).__init__()
         ##
         self.batch_size = batch_size
         self.in_variables = variables
