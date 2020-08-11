@@ -31,8 +31,14 @@ def reformat_data(filename, data_type='h5'):
         df = df.replace([np.inf, -np.inf], np.nan)
         df = df.dropna(axis=0)
         df_new          = pd.DataFrame()
-        df_new['time']  = pd.to_datetime(df.utc_seconds,unit='s')
-        df_new[key]     = pd.to_numeric(df.value)
+
+        try:
+            df_new['time']  = pd.to_datetime(df['utc_seconds'+str(key)],unit='s')
+            df_new[key]     = pd.to_numeric(df[str(key)])
+        except AttributeError:
+            df_new['time']  = pd.to_datetime(df.utc_seconds,unit='s')
+            df_new[key]     = pd.to_numeric(df.value)
+
         ## TODO: double check if using mean will cause any problems
         df_new          = df_new.reset_index().set_index('time').resample('66ms').mean()
         del df_new['index']
@@ -58,7 +64,7 @@ def reformat_data(filename, data_type='h5'):
 
     return status
 
-def load_reformated_cvs(filename):
+def load_reformated_csv(filename):
     df = pd.read_csv(filename)
     df=df.replace([np.inf, -np.inf], np.nan)
     df=df.dropna(axis=0)
