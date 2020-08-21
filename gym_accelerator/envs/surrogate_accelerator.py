@@ -7,6 +7,11 @@ import dataprep.dataset as dp
 from tensorflow import keras
 from sklearn.preprocessing import MinMaxScaler
 
+import logging
+logging.basicConfig(format='%(asctime)s - %(levelname)s - %(message)s')
+logger = logging.getLogger('RL-Logger')
+logger.setLevel(logging.INFO)
+
 np.seterr(divide='ignore', invalid='ignore')
         
 class Surrogate_Accelerator(gym.Env):
@@ -16,6 +21,9 @@ class Surrogate_Accelerator(gym.Env):
     self.min_BIMIN = 103.3
     self.max_BIMIN = 103.4
     self.max_IMINER = 1
+    self.variables = ['B:VIMIN', 'B:IMINER', 'B:LINFRQ', 'I:IB', 'I:MDAT40']
+    self.nbatches = 0
+    self.nsamples = 0
 
     ## Load surrogate model ##
     self.surrogate_model = keras.models.load_model('../surrogate_models/hep_accelerator_5var_08124020_v1.h5')
@@ -42,9 +50,10 @@ class Surrogate_Accelerator(gym.Env):
 
     self.actionMap_VIMIN = [0, 0.0001, 0.001,  0.01, -0.0001,-0.001, -0.01]
     self.action_space = spaces.Discrete(7)
-
+    self.VIMIN = 0
     ##
     self.state = np.zeros(5)
+    self.predicted_state = np.zeros(5)
     self.reset
 
   def seed(self, seed=None):
@@ -53,41 +62,50 @@ class Surrogate_Accelerator(gym.Env):
   
   def step(self,action):
 
-    ##
+    ## Calculate the new B:VINMIN based on policy action
     delta_VIMIN = self.actionMap_VIMIN[action]
     self.VIMIN += delta_VIMIN
 
-    ## New state
-    self.new_state = self.surrogate_model(self.VIMIN)
+    ## Update the B:VIMIN in the predicted state
+    self.predicted_state[0] =  self.VIMIN
+    self.predicted_state = self.predicted_state.reshape(1,1,-1)
+    print(self.predicted_state.shape)
 
-    ## R
-    self.done = bool(
-      abs(self.err) >= self.max_IMINER*20 # fail
-    )
-    
-    self.reward = 0
-    if self.done:
-      self.reward = -10
-    self.reward = -abs(self.err)
-    
-    #print("step-->action/reward: ",action,self.reward)
-    self.state = np.array([self.err])
-    #print("step-->state/action/reward: ",self.state,action,self.reward)
-    #print("end of step-->\n")
-    return self.state, self.reward, self.done, {}
+    ## TODO: Fix concatenate
+    ## Concate the last prediction to the current state
+    self.state = np.concatenate([self.state,self.predicted_state],axis=2)
+    print(self.state.shape)
+
+    ## Pop off the older sample from state
+
+    print(self.state.shape)
+
+    ## Predict new state
+    self.predicted_state = self.surrogate_model.predict(self.state)
+    print(self.predicted_state)
+    iminer = self.predicted_state[0][1]
+    iminer = self.scalers[1].inverse_transform(np.array([iminer]).reshape(1,-1))
+    print(iminer)
+    reward = -abs(iminer)
+    done = bool(abs(iminer) >= self.max_IMINER*10)
+
+
+
+    return self.predicted_state, reward, done, {}
   
   def reset(self):
     ## Prepare the random sample ##
-    variables = ['B:VIMIN', 'B:IMINER', 'B:LINFRQ', 'I:IB', 'I:MDAT40']
-    self.scalers, X_train, Y_train, _ , _ = dp.get_datasets(self.data,variables)
-    nbatches = X_train.shape[0]
-    nsamples = X_train.shape[2]
-    print(X_train.shape)
-    this_batch = np.random.randint(0, high=nbatches)
+    self.scalers, X_train, Y_train, _ , _ = dp.get_datasets(self.data,self.variables)
+    self.nbatches = X_train.shape[0]
+    self.nsamples = X_train.shape[2]
+    logger.info(X_train.shape)
+    this_batch = np.random.randint(0, high=self.nbatches)
     reset_data = X_train[this_batch]
-    print(reset_data.shape)
+    logger.info(reset_data.shape)
     self.state = reset_data.flatten()#reshape(1,-1)
-    self.VIMIN = self.state[int(nsamples/len(variables))]
-    print(self.VIMIN)
-    print(scalers[0].inverse_transform(np.array([self.VIMIN]).reshape(1,-1)))
+    self.VIMIN = self.state[int(self.nsamples/len(self.variables))]
+    logger.info(self.VIMIN)
+    logger.info(self.scalers[0].inverse_transform(np.array([self.VIMIN]).reshape(1,-1)))
+    self.state = self.state.reshape(1,1,-1)
+    logger.info(self.state.shape)
     return self.state
