@@ -71,12 +71,18 @@ class Surrogate_Accelerator(gym.Env):
     self.predicted_state = self.predicted_state.reshape(1,1,-1)
     print(self.predicted_state.shape)
 
-    ## TODO: Fix concatenate
-    ## Concate the last prediction to the current state
-    self.state = np.concatenate([self.state,self.predicted_state],axis=2)
+
+    ## Shift trace by removing the oldest step and adding the new prediction.
+    start_trace =0
+    end_trace   =0
+    for i in range(len(self.variables)):
+      start_trace = end_trace
+      end_trace   = start_trace+int(self.nsamples/len(self.variables))-1
+      print('start/stop/length of trace: {}/{}'.format(start_trace,end_trace,end_trace-start_trace))
+      self.state[0, 0, start_trace:end_trace-1] = self.state[0,0,start_trace+1:end_trace]
+      self.state[0, 0, end_trace] = self.predicted_state[0,0,i]
     print(self.state.shape)
 
-    ## Pop off the older sample from state
 
     print(self.state.shape)
 
