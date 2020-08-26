@@ -71,21 +71,25 @@ class Surrogate_Accelerator(gym.Env):
     self.VIMIN += delta_VIMIN
 
     ## Update the B:VIMIN based on the action for  the in the predicted state
-    print('predicted_state shape{}'.format(self.predicted_state.shape))
+    print('Step() predicted_state:{}'.format(self.predicted_state))
+    print('Step() predicted_state shape{}'.format(self.predicted_state.shape))
+    print('Step() predicted_state reshaped:{}'.format(self.predicted_state))
     self.predicted_state[0,0,0] =  self.VIMIN
     #print(self.predicted_state.shape)
-    print('Modified predicted_state:{}'.format(self.predicted_state))
+    print('Step() modified predicted_state:{}'.format(self.predicted_state))
 
     ## Shift trace by removing the oldest step and adding the new prediction.
     start_trace =0
     end_trace   =0
     for i in range(len(self.variables)):
-        start_trace = end_trace
-        end_trace   = start_trace+int(self.nsamples/len(self.variables))-1
-        print('Step() start/stop/length of trace: {}/{}'.format(start_trace,end_trace,end_trace-start_trace))
+        length = int(self.nsamples/len(self.variables))
+        end_trace   = start_trace+length
+        print('Step() start/stop/length of trace: {}/{}/{}'.format(start_trace,end_trace,length))
         self.state[0, 0, start_trace:end_trace-1] = self.state[0,0,start_trace+1:end_trace]
         print('Step() replace:{}'.format(self.predicted_state[0,0,i]))
         self.state[0, 0, end_trace-1:end_trace] = self.predicted_state[0,0,i]
+        start_trace = end_trace
+
     print('Step state:{}'.format(self.state.shape))
     #print(self.state[0, 0,-2:-1])
 
@@ -100,7 +104,7 @@ class Surrogate_Accelerator(gym.Env):
     print('iminer:{}'.format(iminer))
     reward = -abs(iminer)
     done = bool(abs(iminer) >= 10)
-    self.render()
+    ##self.render()
 
     return self.predicted_state, reward, done, {}
   
@@ -116,7 +120,7 @@ class Surrogate_Accelerator(gym.Env):
     reset_data = X_train[this_batch]
     logger.info('reset_data.shape:{}'.format(reset_data.shape))
     self.state = reset_data.flatten()
-    self.VIMIN = self.state[int(self.nsamples/len(self.variables)-1)]
+    self.VIMIN = self.state[int(self.nsamples/len(self.variables))]
     logger.info('Normed VIMIN:{}'.format(self.VIMIN))
     logger.info('B:VIMIN:{}'.format(self.scalers[0].inverse_transform(np.array([self.VIMIN]).reshape(1,-1))))
     self.state = self.state.reshape(1,1,-1)
@@ -145,9 +149,9 @@ class Surrogate_Accelerator(gym.Env):
       start_trace = end_trace
       end_trace = start_trace + int(self.nsamples / len(self.variables)) - 1
       print(self.variables[v])
-      utrace = self.state[0,0,start_trace:end_trace].reshape(-1,1)
+      utrace = self.state[0,0,start_trace:end_trace]
       #print('utrace:\n {}'.format(utrace))
-      trace = self.scalers[v].inverse_transform(utrace)
+      trace = self.scalers[v].inverse_transform(utrace.reshape(-1,1))
       #print('trace:\n {}'.format(trace))
       axs[v].plot(trace)
       #axs[v].legend(title=self.variables[v])
@@ -155,3 +159,4 @@ class Surrogate_Accelerator(gym.Env):
     #plt.show()
     #print(os.getcwd() )
     plt.savefig('../render/episode{}_step{}_v1.png'.format(self.episodes,self.steps))
+    #plt.close()
