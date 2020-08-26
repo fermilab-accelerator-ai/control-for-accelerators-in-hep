@@ -113,7 +113,7 @@ class DQN:
         batch_states = []
         batch_target = []
         for state, action, reward, next_state, done in minibatch:
-            print('MS::Shape:{}'.format(state.shape))
+            #print('MS::Shape:{}'.format(state.shape))
             np_state = np.array(state).reshape(1,len(state))
             np_next_state = np.array(next_state).reshape(1,len(next_state))
             expectedQ =0 
