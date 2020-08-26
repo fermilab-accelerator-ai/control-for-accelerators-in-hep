@@ -34,7 +34,11 @@ class Surrogate_Accelerator(gym.Env):
 
     ## Load data to initilize the env ##
     filename = 'MLParamData_1583906408.4261804_From_MLrn_2020-03-10+00_00_00_to_2020-03-11+00_00_00.h5_processed.csv.gz'
-    self.data = dp.load_reformated_cvs('../data/' + filename)
+    data = dp.load_reformated_cvs('../data/' + filename)
+    self.scalers, self.X_train, self.Y_train, _ , _ = dp.get_datasets(data,self.variables)
+    self.nbatches = self.X_train.shape[0]
+    self.nsamples = self.X_train.shape[2]
+    logger.info('X_train.shape:{}'.format(self.X_train.shape))
 
     #self.low_state = np.array(
     #  [self.min_BIMIN,-self.max_IMINER], dtype=np.float64
@@ -106,18 +110,14 @@ class Surrogate_Accelerator(gym.Env):
     done = bool(abs(iminer) >= 10)
     ##self.render()
 
-    return self.predicted_state, reward, done, {}
+    return self.predicted_state.flatten(), reward.flatten(), done, {}
   
   def reset(self):
     self.episodes += 1
     self.steps = 0
     ## Prepare the random sample ##
-    self.scalers, X_train, Y_train, _ , _ = dp.get_datasets(self.data,self.variables)
-    self.nbatches = X_train.shape[0]
-    self.nsamples = X_train.shape[2]
-    logger.info('X_train.shape:{}'.format(X_train.shape))
     this_batch = np.random.randint(0, high=self.nbatches)
-    reset_data = X_train[this_batch]
+    reset_data = self.X_train[this_batch]
     logger.info('reset_data.shape:{}'.format(reset_data.shape))
     self.state = reset_data.flatten()
     self.VIMIN = self.state[int(self.nsamples/len(self.variables))]
@@ -133,7 +133,7 @@ class Surrogate_Accelerator(gym.Env):
         end_trace   = start_trace+int(self.nsamples/len(self.variables))-1
         self.predicted_state[0, 0, i] = self.state[0, 0, end_trace - 1:end_trace]
     print('Reset newest states{}'.format(self.predicted_state))
-    return self.predicted_state
+    return self.predicted_state.flatten()
 
   def render(self):
     '''

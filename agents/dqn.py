@@ -17,7 +17,7 @@ logger.setLevel(logging.ERROR)
 
 #The Deep Q-Network (DQN)
 class DQN:
-    def __init__(self, env,cfg='cfg/dqn_setup.json'):
+    def __init__(self, env,cfg='../cfg/dqn_setup.json'):
         self.env = env
         self.memory = deque(maxlen = 2000)
         self.avg_reward = 0
@@ -27,10 +27,10 @@ class DQN:
         self.individual_action_taken = np.ones(self.env.action_space.n)
             
         ## Setup GPU cfg
-        config = tf.ConfigProto()
-        config.gpu_options.allow_growth = True
-        sess = tf.Session(config=config)
-        set_session(sess)
+        #config = tf.ConfigProto()
+        #config.gpu_options.allow_growth = True
+        #sess = tf.Session(config=config)
+        #set_session(sess)
         
         ## Get hyper-parameters from json cfg file
         data = []
@@ -81,6 +81,8 @@ class DQN:
         self.memory.append((state, action, reward, next_state, done))
 
     def action(self, state):
+        action = 0
+        policy_type = 0
         if np.random.rand() <= self.epsilon:
             logger.info('Random action')
             action = random.randrange(self.env.action_space.n)
@@ -90,10 +92,12 @@ class DQN:
         else:
             logger.info('NN action')
             np_state = np.array(state).reshape(1,len(state))
+            logger.info('NN action shape{}'.format(np_state.shape))
             act_values = self.target_model.predict(np_state)
             action = np.argmax(act_values[0])
+            policy_type=1
 
-        return action
+        return action,policy_type
 
     def play(self,state):
         act_values = self.target_model.predict(state)
@@ -109,7 +113,7 @@ class DQN:
         batch_states = []
         batch_target = []
         for state, action, reward, next_state, done in minibatch:
- 
+            print('MS::Shape:{}'.format(state.shape))
             np_state = np.array(state).reshape(1,len(state))
             np_next_state = np.array(next_state).reshape(1,len(next_state))
             expectedQ =0 
