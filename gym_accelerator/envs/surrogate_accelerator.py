@@ -47,7 +47,7 @@ class Surrogate_Accelerator(gym.Env):
       dtype = np.float64
     )
 
-    self.actionMap_VIMIN = [0, 0.0001, 0.001,  0.01, -0.0001,-0.001, -0.01]
+    self.actionMap_VIMIN = [0, 0.0001, 0.005, 0.001 , -0.0001,-0.005, -0.001]
     self.action_space = spaces.Discrete(7)
     self.VIMIN = 0
     ##
