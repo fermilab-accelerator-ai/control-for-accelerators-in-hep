@@ -38,7 +38,7 @@ class Surrogate_Accelerator(gym.Env):
     self.scalers, self.X_train, self.Y_train, _ , _ = dp.get_datasets(data,self.variables)
     self.nbatches = self.X_train.shape[0]
     self.nsamples = self.X_train.shape[2]
-    logger.info('X_train.shape:{}'.format(self.X_train.shape))
+    logger.debug('X_train.shape:{}'.format(self.X_train.shape))
 
     #self.low_state = np.array(
     #  [self.min_BIMIN,-self.max_IMINER], dtype=np.float64
@@ -61,7 +61,7 @@ class Surrogate_Accelerator(gym.Env):
     ##
     self.state = np.zeros(5)## shape=(1,1,750)
     self.predicted_state = np.zeros(shape=(1,1,5))
-    print('Init pred shape:{}'.format(self.predicted_state.shape))
+    logger.debug('Init pred shape:{}'.format(self.predicted_state.shape))
     self.reset
 
   def seed(self, seed=None):
@@ -75,12 +75,11 @@ class Surrogate_Accelerator(gym.Env):
     self.VIMIN += delta_VIMIN
 
     ## Update the B:VIMIN based on the action for  the in the predicted state
-    print('Step() predicted_state:{}'.format(self.predicted_state))
-    print('Step() predicted_state shape{}'.format(self.predicted_state.shape))
-    print('Step() predicted_state reshaped:{}'.format(self.predicted_state))
+    logger.debug('Step() predicted_state:{}'.format(self.predicted_state))
+    logger.debug('Step() predicted_state shape{}'.format(self.predicted_state.shape))
+    logger.debug('Step() predicted_state reshaped:{}'.format(self.predicted_state))
     self.predicted_state[0,0,0] =  self.VIMIN
-    #print(self.predicted_state.shape)
-    print('Step() modified predicted_state:{}'.format(self.predicted_state))
+    logger.debug('Step() modified predicted_state:{}'.format(self.predicted_state))
 
     ## Shift trace by removing the oldest step and adding the new prediction.
     start_trace =0
@@ -88,29 +87,31 @@ class Surrogate_Accelerator(gym.Env):
     for i in range(len(self.variables)):
         length = int(self.nsamples/len(self.variables))
         end_trace   = start_trace+length
-        print('Step() start/stop/length of trace: {}/{}/{}'.format(start_trace,end_trace,length))
+        logger.debug('Step() start/stop/length of trace: {}/{}/{}'.format(start_trace,end_trace,length))
         self.state[0, 0, start_trace:end_trace-1] = self.state[0,0,start_trace+1:end_trace]
-        print('Step() replace:{}'.format(self.predicted_state[0,0,i]))
+        logger.debug('Step() replace:{}'.format(self.predicted_state[0,0,i]))
         self.state[0, 0, end_trace-1:end_trace] = self.predicted_state[0,0,i]
         start_trace = end_trace
 
-    print('Step state:{}'.format(self.state.shape))
+    logger.debug('Step state:{}'.format(self.state.shape))
     #print(self.state[0, 0,-2:-1])
 
     ## Predict new state
     self.predicted_state = self.surrogate_model.predict(self.state)
-    print('SM predicted_state shape{}'.format(self.predicted_state.shape))
+    logger.debug('SM predicted_state shape{}'.format(self.predicted_state.shape))
     self.predicted_state = self.predicted_state.reshape(1,1,5)
-    print('Step() model predicted_state:{}'.format(self.predicted_state))
+    logger.debug('Step() model predicted_state:{}'.format(self.predicted_state))
     iminer = self.predicted_state[0][0][1]
-    print('norm iminer:{}'.format(iminer))
+    logger.debug('norm iminer:{}'.format(iminer))
     iminer = self.scalers[1].inverse_transform(np.array([iminer]).reshape(1,-1))
-    print('iminer:{}'.format(iminer))
+    logger.debug('iminer:{}'.format(iminer))
     reward = -abs(iminer)
-    done = bool(abs(iminer) >= 10)
-    ##self.render()
+    done = bool(abs(iminer) >= 3)
+    if done:
+      reward-=10
+    self.render()
 
-    return self.predicted_state.flatten(), reward.flatten(), done, {}
+    return self.predicted_state.flatten(), np.asscalar(reward), done, {}
   
   def reset(self):
     self.episodes += 1
@@ -118,13 +119,13 @@ class Surrogate_Accelerator(gym.Env):
     ## Prepare the random sample ##
     this_batch = np.random.randint(0, high=self.nbatches)
     reset_data = self.X_train[this_batch]
-    logger.info('reset_data.shape:{}'.format(reset_data.shape))
+    logger.debug('reset_data.shape:{}'.format(reset_data.shape))
     self.state = reset_data.flatten()
     self.VIMIN = self.state[int(self.nsamples/len(self.variables))]
-    logger.info('Normed VIMIN:{}'.format(self.VIMIN))
-    logger.info('B:VIMIN:{}'.format(self.scalers[0].inverse_transform(np.array([self.VIMIN]).reshape(1,-1))))
+    logger.debug('Normed VIMIN:{}'.format(self.VIMIN))
+    logger.debug('B:VIMIN:{}'.format(self.scalers[0].inverse_transform(np.array([self.VIMIN]).reshape(1,-1))))
     self.state = self.state.reshape(1,1,-1)
-    logger.info('New state shape: {}'.format(self.state.shape))
+    logger.debug('New state shape: {}'.format(self.state.shape))
     ## Load latest state
     start_trace = 0
     end_trace = 0
@@ -132,14 +133,14 @@ class Surrogate_Accelerator(gym.Env):
         start_trace = end_trace
         end_trace   = start_trace+int(self.nsamples/len(self.variables))-1
         self.predicted_state[0, 0, i] = self.state[0, 0, end_trace - 1:end_trace]
-    print('Reset newest states{}'.format(self.predicted_state))
+    logger.info('Reset newest states{}'.format(self.predicted_state))
     return self.predicted_state.flatten()
 
   def render(self):
     '''
     :return:
     '''
-    print('render()')
+    logger.debug('render()')
     import seaborn as sns
     sns.set_style("ticks")
     fig, axs = plt.subplots(len(self.variables), figsize=(8, 12))
@@ -148,7 +149,7 @@ class Surrogate_Accelerator(gym.Env):
     for v in range(len(self.variables)):
       start_trace = end_trace
       end_trace = start_trace + int(self.nsamples / len(self.variables)) - 1
-      print(self.variables[v])
+      ##print(self.variables[v])
       utrace = self.state[0,0,start_trace:end_trace]
       #print('utrace:\n {}'.format(utrace))
       trace = self.scalers[v].inverse_transform(utrace.reshape(-1,1))
@@ -159,4 +160,5 @@ class Surrogate_Accelerator(gym.Env):
     #plt.show()
     #print(os.getcwd() )
     plt.savefig('../render/episode{}_step{}_v1.png'.format(self.episodes,self.steps))
+    plt.close('all')
     #plt.close()
