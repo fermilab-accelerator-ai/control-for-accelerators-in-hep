@@ -1,12 +1,12 @@
 {
     "search_method": "epsilon",
-    "gamma": "0.95",
+    "gamma": "0.75",
     "epsilon": "1.0",
     "epsilon_min" : "0.01",
-    "epsilon_decay" : "0.9995",
-    "learning_rate" : "0.001",
+    "epsilon_decay" : "0.999",
+    "learning_rate" : "0.01",
     "batch_size" : "32",
-    "target_train_interval" : "50",
+    "target_train_interval" : "1",
     "tau":"0.5",
     "save_model":"./model"
 }
