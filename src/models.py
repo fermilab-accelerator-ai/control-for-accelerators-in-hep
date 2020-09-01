@@ -51,20 +51,20 @@ def train_lstm_model(in_shape,out_shape,x,y,epochs=5,batch_size=256):
     ## Make sure that the session is cleared
     keras.backend.clear_session()
     ## Start training
-    strategy = tf.distribute.experimental.MultiWorkerMirroredStrategy()
-    with strategy.scope():
-        model = build_lstm_model(input_shape=in_shape,output_shape=out_shape)
-        opt = Adam(lr=1e-2)
-        #opt = SGD(lr=1e-2,nesterov=True)
-        model.compile(loss='mean_squared_error', optimizer=opt)
-        model.summary()
-        from keras.callbacks import ReduceLROnPlateau, EarlyStopping
-        reduce_lr = ReduceLROnPlateau(monitor='val_loss',
-                                      factor=0.85, patience=5, min_lr=1e-6,verbose=1)
-        early_stopping = EarlyStopping(monitor='val_loss',
-                                       min_delta=0, patience=10, verbose=1, mode='auto',
-                                       baseline=None, restore_best_weights=False)
-
-        history = model.fit(x, y, epochs=epochs, batch_size=batch_size, validation_split=0.2,
-                             callbacks=[reduce_lr,early_stopping], verbose=2, shuffle=True)
-        return history, model
+    #strategy = tf.distribute.experimental.MultiWorkerMirroredStrategy()
+    #with strategy.scope():
+    model = build_lstm_model(input_shape=in_shape,output_shape=out_shape)
+    opt = Adam(lr=1e-2,clipnorm=1.0, clipvalue=0.5)
+    #opt = SGD(lr=1e-2,nesterov=True)
+    model.compile(loss='mean_squared_error', optimizer=opt)
+    model.summary()
+    from keras.callbacks import ReduceLROnPlateau, EarlyStopping
+    reduce_lr = ReduceLROnPlateau(monitor='val_loss',
+                                  factor=0.85, patience=5, min_lr=1e-6,verbose=1)
+    early_stopping = EarlyStopping(monitor='val_loss',
+                                   min_delta=0, patience=10, verbose=1, mode='auto',
+                                   baseline=None, restore_best_weights=False)
+    
+    history = model.fit(x, y, epochs=epochs, batch_size=batch_size, validation_split=0.2,
+                        callbacks=[reduce_lr,early_stopping], verbose=2, shuffle=True)
+    return history, model
