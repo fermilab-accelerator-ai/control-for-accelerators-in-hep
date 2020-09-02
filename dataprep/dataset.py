@@ -94,7 +94,7 @@ def create_dataset(dataset, look_back=1, look_forward=1):
     return np.array(X), np.array(Y)
 
 
-def get_dataset(dataframe, variable='B:VIMIN', split_fraction=0.8):
+def get_dataset(dataframe, variable='B:VIMIN', split_fraction=0.8,concate_axis=1):
     '''
      Description:
          Method that scales the data and split into train/test datasets
@@ -140,8 +140,8 @@ def get_datasets(dataframe,variables = ['B:VIMIN', 'B:IMINER', 'B:LINFRQ', 'I:IB
         data_list.append(get_dataset(dataframe,variable=variables[v],split_fraction=split_fraction))
     ## TODO: Horrible hack that should quickly be fixed
     scalers = [data_list[0][0],data_list[1][0],data_list[2][0],data_list[3][0],data_list[4][0]]
-    X_train = np.concatenate((data_list[0][1], data_list[1][1], data_list[2][1], data_list[3][1], data_list[4][1]), axis=2)
+    X_train = np.concatenate((data_list[0][1], data_list[1][1], data_list[2][1], data_list[3][1], data_list[4][1]), axis=concate_axis)
     Y_train = np.concatenate((data_list[0][2], data_list[1][2], data_list[2][2], data_list[3][2], data_list[4][2]), axis=1)
-    X_test = np.concatenate((data_list[0][3], data_list[1][3], data_list[2][3], data_list[3][3], data_list[4][3]), axis=2)
+    X_test = np.concatenate((data_list[0][3], data_list[1][3], data_list[2][3], data_list[3][3], data_list[4][3]), axis=concate_axis)
     Y_test = np.concatenate((data_list[0][4], data_list[1][4], data_list[2][4], data_list[3][4], data_list[4][4]), axis=1)
     return scalers,X_train,Y_train,X_test,Y_test
