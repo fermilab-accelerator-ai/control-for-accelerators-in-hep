@@ -64,7 +64,7 @@ def reformat_data(filename, data_type='h5'):
     return status
 
 def load_reformated_cvs(filename,nrows=100000):
-    df = pd.read_csv(filename,nrows=100000)
+    df = pd.read_csv(filename,nrows=nrows)
     df=df.replace([np.inf, -np.inf], np.nan)
     df=df.dropna(axis=0)
     return df
