@@ -133,7 +133,7 @@ def get_dataset(dataframe, variable='B:VIMIN', split_fraction=0.8,concate_axis=1
     return scaler, X_train, Y_train, X_test, Y_test
 
 
-def get_datasets(dataframe,variables = ['B:VIMIN', 'B:IMINER', 'B:LINFRQ', 'I:IB', 'I:MDAT40'],split_fraction=0.8):
+def get_datasets(dataframe,variables = ['B:VIMIN', 'B:IMINER', 'B:LINFRQ', 'I:IB', 'I:MDAT40'],split_fraction=0.8,concate_axis=1):
     data_list = []
     scalers = []
     for v in range(len(variables)):
