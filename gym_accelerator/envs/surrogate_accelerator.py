@@ -164,28 +164,13 @@ class Surrogate_Accelerator(gym.Env):
     logger.info('Resetting env')
     self.batch_id=0
     self.state = self.X_train[self.batch_id].reshape(1,5,150)
-    self.predicted_state = self.X_train[self.batch_id][:,-1:]
+    #self.predicted_state = self.X_train[self.batch_id][:,-1:]
     logger.debug('reset_data.shape:{}'.format(self.state.shape))
-    self.VIMIN = self.predicted_state[0,:]
+    self.VIMIN = self.state[0,0,-1:]
     logger.debug('Normed VIMIN:{}'.format(self.VIMIN))
     logger.debug('B:VIMIN:{}'.format(self.scalers[0].inverse_transform(np.array([self.VIMIN]).reshape(1, -1))))
-    '''
-    self.state = reset_data.flatten()
-    self.VIMIN = self.state[int(self.nsamples/len(self.variables))]
-    logger.debug('Normed VIMIN:{}'.format(self.VIMIN))
-    logger.debug('B:VIMIN:{}'.format(self.scalers[0].inverse_transform(np.array([self.VIMIN]).reshape(1,-1))))
-    self.state = self.state.reshape(1,1,-1)
-    logger.debug('New state shape: {}'.format(self.state.shape))
-    ## Load latest state
-    start_trace = 0
-    end_trace = 0
-    for i in range(len(self.variables)):
-        start_trace = end_trace
-        end_trace   = start_trace+int(self.nsamples/len(self.variables))-1
-        self.predicted_state[0, 0, i] = self.state[0, 0, end_trace - 1:end_trace]
-    logger.info('Reset newest states{}'.format(self.predicted_state))
-    '''
-    return self.predicted_state
+
+    return self.state[0,:,-1:]
 
   def render(self):
     '''
