@@ -83,7 +83,14 @@ class Surrogate_Accelerator(gym.Env):
     self.steps += 1
     done = False
 
-    ## Calculate the new B:VINMIN based on policy action
+    ''' Steps:
+      1) Update VIMIN based on action
+      2) Predict booster variables
+      3) Predict next step for injector
+      4) Shift state with new values
+    '''
+
+    ## Step 1: Calculate the new B:VINMIN based on policy action
     logger.info('Step() before action VIMIN:{}'.format(self.VIMIN))
     delta_VIMIN = self.actionMap_VIMIN[action]
     DENORN_BVIMIN = self.scalers[0].inverse_transform(np.array([self.VIMIN ]).reshape(1, -1))
@@ -96,35 +103,37 @@ class Surrogate_Accelerator(gym.Env):
     self.VIMIN = self.scalers[0].transform(DENORN_BVIMIN)
     logger.debug('Step() updated VIMIN:{}'.format(self.VIMIN))
 
-    ## Update the B:VIMIN
     logger.debug('Step() state B:VIMIN\n{}'.format(self.state[0,0,-2:1]))
+    ## TODO: I need to shift the VIMIN data before pushing new VIMIN
     self.state[ 0, 0, -1:] = self.VIMIN
     logger.debug('Step() state with Updated action on B:VIMIN\n{}'.format(self.state[0,0,-2:1]))
 
+    ## Step 2: Predict using booster model
     self.predicted_state = self.booster_model.predict(self.state)
-    #print(self.predicted_state.shape)
     self.predicted_state = self.predicted_state.reshape(1, 5, 1)
 
-    ## Shift state by one step
-    self.state[0, :, 0:-1] = self.state[ 0, :, 1:]
-
-    ## Update IMINER and LINFQN
+    ## Step 3: Update IMINER and LINFQN
     #print(self.state.shape)
-    logger.debug('Step() state with pre-state model\n{}'.format(self.state[0,:,-2:]))
-    self.state[0, 1:3, -1:] = self.predicted_state[0,1:3]
-    logger.debug('Step() state with updated state model\n{}'.format(self.state[0,:,-2:]))
+    #logger.debug('Step() state with pre-state model\n{}'.format(self.state[0,:,-2:]))
+    #self.state[0, 1:3, -1:] = self.predicted_state[0,1:3]
+    #logger.debug('Step() state with updated state model\n{}'.format(self.state[0,:,-2:]))
     #print(self.state.shape)
 
     ## Predict the injector variables
     injector_input = self.state[0,3:5,:].reshape(1,2,150)
-    #print('injector_input {}'.format(injector_input.shape))
     injector_prediction = self.injector_model.predict(injector_input).reshape(1,2,1)
+
     logger.debug('Step() state with pre-injector state model\n{}'.format(self.state[0,:,-2:]))
     logger.debug('Step() state with injector state model shape\n{}'.format(injector_prediction.shape))
-    self.state[0, 3:5, -1:] = injector_prediction[0,:]
+    #self.state[0, 3:5, -1:] = injector_prediction[0,:]
     logger.debug('Step() state with updated injector state model\n{}'.format(self.state[0,:,-2:]))
 
-    self.render()
+    ## Step 4: Shift state by one step and update last time stamp using predictions
+    self.state[0, :, 0:-1] = self.state[ 0, :, 1:]
+    ## Update IMINER and LINFQN
+    self.state[0, 1:3, -1:] = self.predicted_state[0,1:3]
+    ## Update injector variables
+    self.state[0, 3:5, -1:] = injector_prediction[0,:]
 
     iminer = self.predicted_state[0,1]
     logger.debug('norm iminer:{}'.format(iminer))
@@ -135,67 +144,25 @@ class Surrogate_Accelerator(gym.Env):
       logger.info('iminer:{} is out of bounds'.format(iminer))
       done = True
 
-    if self.steps>=3*15:
-      done = True
-
     if done:
-      penalty = (3*15 - self.steps)
+      penalty = 5*(3*15 - self.steps)
       logger.info('penalty:{} is out of bounds'.format(penalty))
       reward -= penalty
+
+    if self.steps>=int(3*15):
+      done = True
+
     self.render()
 
     return self.predicted_state.flatten(), np.asscalar(reward), done, {}
-    '''
-    ## Update the B:VIMIN based on the action for  the in the predicted state
-    logger.debug('Step() predicted_state:{}'.format(self.predicted_state))
-    logger.debug('Step() predicted_state shape{}'.format(self.predicted_state.shape))
-    logger.debug('Step() predicted_state reshaped:{}'.format(self.predicted_state))
-    self.predicted_state[0,0,0] =  self.VIMIN
-    logger.debug('Step() modified predicted_state:{}'.format(self.predicted_state))
-
-    ## Shift trace by removing the oldest step and adding the new prediction.
-    start_trace =0
-    end_trace   =0
-    for i in range(len(self.variables)):
-        length = int(self.nsamples/len(self.variables))
-        end_trace   = start_trace+length
-        logger.debug('Step() start/stop/length of trace: {}/{}/{}'.format(start_trace,end_trace,length))
-        self.state[0, 0, start_trace:end_trace-1] = self.state[0,0,start_trace+1:end_trace]
-        logger.debug('Step() replace:{}'.format(self.predicted_state[0,0,i]))
-        self.state[0, 0, end_trace-1:end_trace] = self.predicted_state[0,0,i]
-        start_trace = end_trace
-
-    logger.debug('Step state:{}'.format(self.state.shape))
-    #print(self.state[0, 0,-2:-1])
-
-    ## Predict new state
-    self.predicted_state = self.surrogate_model.predict(self.state)
-    logger.debug('SM predicted_state shape{}'.format(self.predicted_state.shape))
-    self.predicted_state = self.predicted_state.reshape(1,1,5)
-    logger.debug('Step() model predicted_state:{}'.format(self.predicted_state))
-    iminer = self.predicted_state[0][0][1]
-    logger.info('norm iminer:{}'.format(iminer))
-    iminer = self.scalers[1].inverse_transform(np.array([iminer]).reshape(1,-1))
-    logger.info('iminer:{}'.format(iminer))
-    reward = -abs(iminer)
-    if abs(iminer) >= 2:
-      logger.info('iminer:{} is out of bounds'.format(iminer))
-      done =True
-
-    if done:
-      penalty = (100-self.steps)
-      logger.info('penalty:{} is out of bounds'.format(penalty))
-      reward-=penalty
-    self.render()
-  
-    return self.predicted_state.flatten(), np.asscalar(reward), done, {}
-    '''
   
   def reset(self):
     self.episodes += 1
     self.steps = 0
     ## Prepare the random sample ##
     #self.batch_id = np.random.randint(0, high=self.nbatches)
+    logger.info('Resetting env')
+    self.batch_id=0
     self.state = self.X_train[self.batch_id].reshape(1,5,150)
     self.predicted_state = self.X_train[self.batch_id][:,-1:]
     logger.debug('reset_data.shape:{}'.format(self.state.shape))
