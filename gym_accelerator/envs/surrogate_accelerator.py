@@ -57,7 +57,7 @@ class Surrogate_Accelerator(gym.Env):
                              axis=1)
     self.nbatches = self.X_train.shape[0]
     self.nsamples = self.X_train.shape[2]
-    self.batch_id = np.random.randint(0, high=self.nbatches)
+    self.batch_id = 0 #np.random.randint(0, high=self.nbatches)
 
     self.observation_space = spaces.Box(
       low   = 0,
@@ -70,7 +70,7 @@ class Surrogate_Accelerator(gym.Env):
     self.action_space = spaces.Discrete(7)
     self.VIMIN = 0
     ##
-    self.state = np.zeros(5)
+    self.state = np.zeros(shape=(1,5,150))
     self.predicted_state = np.zeros(shape=(1,5,1))
     logger.debug('Init pred shape:{}'.format(self.predicted_state.shape))
     #self.reset()
@@ -81,6 +81,7 @@ class Surrogate_Accelerator(gym.Env):
   
   def step(self,action):
     self.steps += 1
+    logger.info('Episode/State: {}/{}'.format(self.episodes,self.steps))
     done = False
 
     ''' Steps:
@@ -154,7 +155,7 @@ class Surrogate_Accelerator(gym.Env):
 
     self.render()
 
-    return self.predicted_state.flatten(), np.asscalar(reward), done, {}
+    return self.state[0,:,-1:].flatten(), np.asscalar(reward), done, {}
   
   def reset(self):
     self.episodes += 1
@@ -163,8 +164,10 @@ class Surrogate_Accelerator(gym.Env):
     #self.batch_id = np.random.randint(0, high=self.nbatches)
     logger.info('Resetting env')
     self.batch_id=0
-    self.state = self.X_train[self.batch_id].reshape(1,5,150)
-    #self.predicted_state = self.X_train[self.batch_id][:,-1:]
+    #self.state = np.zeros(shape=(1,5,150))
+    logger.debug('self.state:{}'.format(self.state))
+    self.state = np.copy(self.X_train[self.batch_id].reshape(1,5,150))
+    logger.debug('self.state:{}'.format(self.state))
     logger.debug('reset_data.shape:{}'.format(self.state.shape))
     self.VIMIN = self.state[0,0,-1:]
     logger.debug('Normed VIMIN:{}'.format(self.VIMIN))
@@ -182,9 +185,10 @@ class Surrogate_Accelerator(gym.Env):
     fig, axs = plt.subplots(len(self.variables), figsize=(8, 12))
     start_trace =0
     end_trace   =0
+    logger.debug('self.state:{}'.format(self.state))
     for v in range(len(self.variables)):
       utrace = self.state[0, v, :]
-      trace = self.scalers[v].inverse_transform(utrace.reshape(-1, 1))
+      trace  = self.scalers[v].inverse_transform(utrace.reshape(-1, 1))
       axs[v].plot(trace)
       '''
       start_trace = end_trace
