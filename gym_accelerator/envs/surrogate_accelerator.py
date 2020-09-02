@@ -12,7 +12,7 @@ import numpy as np
 import logging
 logging.basicConfig(format='%(asctime)s - %(levelname)s - %(message)s')
 logger = logging.getLogger('RL-Logger')
-logger.setLevel(logging.DEBUG)
+logger.setLevel(logging.INFO)
 
 np.seterr(divide='ignore', invalid='ignore')
         
@@ -88,48 +88,48 @@ class Surrogate_Accelerator(gym.Env):
     delta_VIMIN = self.actionMap_VIMIN[action]
     DENORN_BVIMIN = self.scalers[0].inverse_transform(np.array([self.VIMIN ]).reshape(1, -1))
     DENORN_BVIMIN += delta_VIMIN
-    logger.info('Step() descaled VIMIN:{}'.format(DENORN_BVIMIN))
+    logger.debug('Step() descaled VIMIN:{}'.format(DENORN_BVIMIN))
     if DENORN_BVIMIN < self.min_BIMIN or DENORN_BVIMIN > self.max_BIMIN:
       logger.info('Step() descaled VIMIN:{} is out of bounds.'.format(DENORN_BVIMIN))
       done = True
 
     self.VIMIN = self.scalers[0].transform(DENORN_BVIMIN)
-    logger.info('Step() updated VIMIN:{}'.format(self.VIMIN))
+    logger.debug('Step() updated VIMIN:{}'.format(self.VIMIN))
 
     ## Update the B:VIMIN
-    logger.info('Step() state B:VIMIN\n{}'.format(self.state[0,0,-2:1]))
+    logger.debug('Step() state B:VIMIN\n{}'.format(self.state[0,0,-2:1]))
     self.state[ 0, 0, -1:] = self.VIMIN
-    logger.info('Step() state with Updated action on B:VIMIN\n{}'.format(self.state[0,0,-2:1]))
+    logger.debug('Step() state with Updated action on B:VIMIN\n{}'.format(self.state[0,0,-2:1]))
 
     self.predicted_state = self.booster_model.predict(self.state)
-    print(self.predicted_state.shape)
+    #print(self.predicted_state.shape)
     self.predicted_state = self.predicted_state.reshape(1, 5, 1)
 
     ## Shift state by one step
     self.state[0, :, 0:-1] = self.state[ 0, :, 1:]
 
     ## Update IMINER and LINFQN
-    print(self.state.shape)
-    logger.info('Step() state with pre-state model\n{}'.format(self.state[0,:,-2:]))
+    #print(self.state.shape)
+    logger.debug('Step() state with pre-state model\n{}'.format(self.state[0,:,-2:]))
     self.state[0, 1:3, -1:] = self.predicted_state[0,1:3]
-    logger.info('Step() state with updated state model\n{}'.format(self.state[0,:,-2:]))
-    print(self.state.shape)
+    logger.debug('Step() state with updated state model\n{}'.format(self.state[0,:,-2:]))
+    #print(self.state.shape)
 
     ## Predict the injector variables
     injector_input = self.state[0,3:5,:].reshape(1,2,150)
-    print('injector_input {}'.format(injector_input.shape))
+    #print('injector_input {}'.format(injector_input.shape))
     injector_prediction = self.injector_model.predict(injector_input).reshape(1,2,1)
-    logger.info('Step() state with pre-injector state model\n{}'.format(self.state[0,:,-2:]))
-    logger.info('Step() state with injector state model shape\n{}'.format(injector_prediction.shape))
+    logger.debug('Step() state with pre-injector state model\n{}'.format(self.state[0,:,-2:]))
+    logger.debug('Step() state with injector state model shape\n{}'.format(injector_prediction.shape))
     self.state[0, 3:5, -1:] = injector_prediction[0,:]
-    logger.info('Step() state with updated injector state model\n{}'.format(self.state[0,:,-2:]))
+    logger.debug('Step() state with updated injector state model\n{}'.format(self.state[0,:,-2:]))
 
     self.render()
 
     iminer = self.predicted_state[0,1]
-    logger.info('norm iminer:{}'.format(iminer))
+    logger.debug('norm iminer:{}'.format(iminer))
     iminer = self.scalers[1].inverse_transform(np.array([iminer]).reshape(1, -1))
-    logger.info('iminer:{}'.format(iminer))
+    logger.debug('iminer:{}'.format(iminer))
     reward = -abs(iminer)
     if abs(iminer) >= 2:
       logger.info('iminer:{} is out of bounds'.format(iminer))
