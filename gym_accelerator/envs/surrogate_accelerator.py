@@ -7,11 +7,12 @@ import dataprep.dataset as dp
 from tensorflow import keras
 from sklearn.preprocessing import MinMaxScaler
 import matplotlib.pyplot as plt
+import numpy as np
 
 import logging
 logging.basicConfig(format='%(asctime)s - %(levelname)s - %(message)s')
 logger = logging.getLogger('RL-Logger')
-logger.setLevel(logging.INFO)
+logger.setLevel(logging.DEBUG)
 
 np.seterr(divide='ignore', invalid='ignore')
         
@@ -20,26 +21,44 @@ class Surrogate_Accelerator(gym.Env):
 
     self.episodes = 0
     self.steps= 0
+
     ## Define boundary ##
     self.min_BIMIN = 103.1
     self.max_BIMIN = 103.6
     #self.max_IMINER = 1
-    self.variables = ['B:VIMIN', 'B:IMINER', 'B:LINFRQ', 'I:IB', 'I:MDAT40']
-    self.nbatches = 0
-    self.nsamples = 0
+    #self.variables = ['B:VIMIN', 'B:IMINER', 'B:LINFRQ', 'I:IB', 'I:MDAT40']
+    #self.nbatches = 0
+    #self.nsamples = 0
 
-    ## Load surrogate model ##
-    self.surrogate_model = keras.models.load_model('../surrogate_models/hep_accelerator_5var_08124020_v1.h5')
-    self.surrogate_model.summary()
+    ## Load surrogate models ##
+    self.booster_model = keras.models.load_model('../surrogate_models/model_booster_adam256_e350_bs99_nsteps250k.h5')
+    self.injector_model = keras.models.load_model('../surrogate_models/model_injector_adam256_e350_bs99_nsteps250k.h5')
+
+    ## Load scalers ##
 
     ## Load data to initilize the env ##
     filename = 'MLParamData_1583906408.4261804_From_MLrn_2020-03-10+00_00_00_to_2020-03-11+00_00_00.h5_processed.csv.gz'
-    data = dp.load_reformated_cvs('../data/' + filename)
-    self.scalers, self.X_train, self.Y_train, _ , _ = dp.get_datasets(data,self.variables)
+    data = dp.load_reformated_cvs('../data/' + filename,nrows=250000)
+    self.variables = ['B:VIMIN', 'B:IMINER', 'B:LINFRQ', 'I:IB', 'I:MDAT40']
+    data_list = []
+    for v in range(len(self.variables)):
+      data_list.append(self.get_dataset(data,variable=self.variables[v]))
+
+    ## TODO: Maybe we need to load the saved scalers to make sure it ok.
+    self.scalers = [data_list[0][0],data_list[1][0],data_list[2][0],data_list[3][0],data_list[4][0]]
+
+    # Axis
+    concate_axis = 1
+
+    ## data
+    self.X_train = np.concatenate((data_list[0][1], data_list[1][1], data_list[2][1], data_list[3][1], data_list[4][1]),
+                             axis=concate_axis)
+    self.Y_train = np.concatenate((data_list[0][2], data_list[1][2], data_list[2][2], data_list[3][2], data_list[4][2]),
+                             axis=1)
     self.nbatches = self.X_train.shape[0]
     self.nsamples = self.X_train.shape[2]
-    logger.debug('X_train.shape:{}'.format(self.X_train.shape))
-    
+    self.batch_id = np.random.randint(0, high=self.nbatches)
+
     self.observation_space = spaces.Box(
       low   = 0,
       high  = +1,
@@ -51,10 +70,10 @@ class Surrogate_Accelerator(gym.Env):
     self.action_space = spaces.Discrete(7)
     self.VIMIN = 0
     ##
-    self.state = np.zeros(5)## shape=(1,1,750)
-    self.predicted_state = np.zeros(shape=(1,1,5))
+    self.state = np.zeros(5)
+    self.predicted_state = np.zeros(shape=(1,5,1))
     logger.debug('Init pred shape:{}'.format(self.predicted_state.shape))
-    self.reset()
+    #self.reset()
 
   def seed(self, seed=None):
     self.np_random, seed = seeding.np_random(seed)
@@ -63,20 +82,70 @@ class Surrogate_Accelerator(gym.Env):
   def step(self,action):
     self.steps += 1
     done = False
-    ## Calculate the new B:VINMIN based on policy action
-    logger.info('Start VIMIN:{}'.format(self.VIMIN))
 
+    ## Calculate the new B:VINMIN based on policy action
+    logger.info('Step() before action VIMIN:{}'.format(self.VIMIN))
     delta_VIMIN = self.actionMap_VIMIN[action]
     DENORN_BVIMIN = self.scalers[0].inverse_transform(np.array([self.VIMIN ]).reshape(1, -1))
     DENORN_BVIMIN += delta_VIMIN
-    logger.info('Descaled VIMIN:{}'.format(DENORN_BVIMIN))
+    logger.info('Step() descaled VIMIN:{}'.format(DENORN_BVIMIN))
     if DENORN_BVIMIN < self.min_BIMIN or DENORN_BVIMIN > self.max_BIMIN:
-      logger.info('Descaled VIMIN:{} is out of bounds.'.format(DENORN_BVIMIN))
+      logger.info('Step() descaled VIMIN:{} is out of bounds.'.format(DENORN_BVIMIN))
       done = True
 
     self.VIMIN = self.scalers[0].transform(DENORN_BVIMIN)
-    logger.info('Updated VIMIN:{}'.format(self.VIMIN))
+    logger.info('Step() updated VIMIN:{}'.format(self.VIMIN))
 
+    ## Update the B:VIMIN
+    logger.info('Step() state B:VIMIN\n{}'.format(self.state[0,0,-2:1]))
+    self.state[ 0, 0, -1:] = self.VIMIN
+    logger.info('Step() state with Updated action on B:VIMIN\n{}'.format(self.state[0,0,-2:1]))
+
+    self.predicted_state = self.booster_model.predict(self.state)
+    print(self.predicted_state.shape)
+    self.predicted_state = self.predicted_state.reshape(1, 5, 1)
+
+    ## Shift state by one step
+    self.state[0, :, 0:-1] = self.state[ 0, :, 1:]
+
+    ## Update IMINER and LINFQN
+    print(self.state.shape)
+    logger.info('Step() state with pre-state model\n{}'.format(self.state[0,:,-2:]))
+    self.state[0, 1:3, -1:] = self.predicted_state[0,1:3]
+    logger.info('Step() state with updated state model\n{}'.format(self.state[0,:,-2:]))
+    print(self.state.shape)
+
+    ## Predict the injector variables
+    injector_input = self.state[0,3:5,:].reshape(1,2,150)
+    print('injector_input {}'.format(injector_input.shape))
+    injector_prediction = self.injector_model.predict(injector_input).reshape(1,2,1)
+    logger.info('Step() state with pre-injector state model\n{}'.format(self.state[0,:,-2:]))
+    logger.info('Step() state with injector state model shape\n{}'.format(injector_prediction.shape))
+    self.state[0, 3:5, -1:] = injector_prediction[0,:]
+    logger.info('Step() state with updated injector state model\n{}'.format(self.state[0,:,-2:]))
+
+    self.render()
+
+    iminer = self.predicted_state[0,1]
+    logger.info('norm iminer:{}'.format(iminer))
+    iminer = self.scalers[1].inverse_transform(np.array([iminer]).reshape(1, -1))
+    logger.info('iminer:{}'.format(iminer))
+    reward = -abs(iminer)
+    if abs(iminer) >= 2:
+      logger.info('iminer:{} is out of bounds'.format(iminer))
+      done = True
+
+    if self.steps>=3*15:
+      done = True
+
+    if done:
+      penalty = (3*15 - self.steps)
+      logger.info('penalty:{} is out of bounds'.format(penalty))
+      reward -= penalty
+    self.render()
+
+    return self.predicted_state.flatten(), np.asscalar(reward), done, {}
+    '''
     ## Update the B:VIMIN based on the action for  the in the predicted state
     logger.debug('Step() predicted_state:{}'.format(self.predicted_state))
     logger.debug('Step() predicted_state shape{}'.format(self.predicted_state.shape))
@@ -114,20 +183,26 @@ class Surrogate_Accelerator(gym.Env):
       done =True
 
     if done:
-      penalty = 10*(15-self.steps)
+      penalty = (100-self.steps)
       logger.info('penalty:{} is out of bounds'.format(penalty))
       reward-=penalty
     self.render()
-
+  
     return self.predicted_state.flatten(), np.asscalar(reward), done, {}
+    '''
   
   def reset(self):
     self.episodes += 1
     self.steps = 0
     ## Prepare the random sample ##
-    this_batch = np.random.randint(0, high=self.nbatches)
-    reset_data = self.X_train[this_batch]
-    logger.debug('reset_data.shape:{}'.format(reset_data.shape))
+    #self.batch_id = np.random.randint(0, high=self.nbatches)
+    self.state = self.X_train[self.batch_id].reshape(1,5,150)
+    self.predicted_state = self.X_train[self.batch_id][:,-1:]
+    logger.debug('reset_data.shape:{}'.format(self.state.shape))
+    self.VIMIN = self.predicted_state[0,:]
+    logger.debug('Normed VIMIN:{}'.format(self.VIMIN))
+    logger.debug('B:VIMIN:{}'.format(self.scalers[0].inverse_transform(np.array([self.VIMIN]).reshape(1, -1))))
+    '''
     self.state = reset_data.flatten()
     self.VIMIN = self.state[int(self.nsamples/len(self.variables))]
     logger.debug('Normed VIMIN:{}'.format(self.VIMIN))
@@ -142,7 +217,8 @@ class Surrogate_Accelerator(gym.Env):
         end_trace   = start_trace+int(self.nsamples/len(self.variables))-1
         self.predicted_state[0, 0, i] = self.state[0, 0, end_trace - 1:end_trace]
     logger.info('Reset newest states{}'.format(self.predicted_state))
-    return self.predicted_state.flatten()
+    '''
+    return self.predicted_state
 
   def render(self):
     '''
@@ -155,6 +231,10 @@ class Surrogate_Accelerator(gym.Env):
     start_trace =0
     end_trace   =0
     for v in range(len(self.variables)):
+      utrace = self.state[0, v, :]
+      trace = self.scalers[v].inverse_transform(utrace.reshape(-1, 1))
+      axs[v].plot(trace)
+      '''
       start_trace = end_trace
       end_trace = start_trace + int(self.nsamples / len(self.variables)) - 1
       ##print(self.variables[v])
@@ -164,9 +244,41 @@ class Surrogate_Accelerator(gym.Env):
       #print('trace:\n {}'.format(trace))
       axs[v].plot(trace)
       #axs[v].legend(title=self.variables[v])
-
+      '''
     #plt.show()
     #print(os.getcwd() )
     plt.savefig('../render/episode{}_step{}_v1.png'.format(self.episodes,self.steps))
     plt.close('all')
     #plt.close()
+
+  def create_dataset(self, dataset, look_back=10*15, look_forward=1):
+    X, Y = [], []
+    offset = look_back + look_forward
+    for i in range(len(dataset) - (offset + 1)):
+      xx = dataset[i:(i + look_back), 0]
+      yy = dataset[(i + look_back):(i + offset), 0]
+      X.append(xx)
+      Y.append(yy)
+    return np.array(X), np.array(Y)
+
+  def get_dataset(self, df, variable='B:VIMIN'):
+    dataset = df[variable].values  # numpy.ndarray
+    dataset = dataset.astype('float32')
+    dataset = np.reshape(dataset, (-1, 1))
+    scaler = MinMaxScaler(feature_range=(0, 1))
+    dataset = scaler.fit_transform(dataset)
+
+    ## TODO: Fix
+    train_size = int(len(dataset) * 0.70)
+    train, test = dataset[0:train_size, :], dataset[train_size:len(dataset), :]
+
+    X_train, Y_train = self.create_dataset(train)
+    X_train = np.reshape(X_train, (X_train.shape[0], 1, X_train.shape[1]))
+    Y_train = np.reshape(Y_train, (Y_train.shape[0], Y_train.shape[1]))
+
+    #X_test, Y_test = create_dataset(test, look_back, look_forward)
+    #X_test = np.reshape(X_test, (X_test.shape[0], 1, X_test.shape[1]))
+    #Y_test = np.reshape(Y_test, (Y_test.shape[0], Y_test.shape[1]))
+
+    return scaler, X_train, Y_train#, X_test, Y_test
+
