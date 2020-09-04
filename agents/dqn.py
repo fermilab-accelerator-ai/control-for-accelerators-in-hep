@@ -113,7 +113,6 @@ class DQN:
         batch_states = []
         batch_target = []
         for state, action, reward, next_state, done in minibatch:
-            #print('MS::Shape:{}'.format(state.shape))
             np_state = np.array(state).reshape(1,len(state))
             np_next_state = np.array(next_state).reshape(1,len(next_state))
             expectedQ =0 
@@ -135,14 +134,12 @@ class DQN:
         self.train_writer.writerow([np.mean(losses)])
         self.train_file.flush()
         
-        if self.target_train_counter%self.target_train_interval == 0:
-            logger.info('### TRAINING TARGET MODEL ###')
-            self.target_train()
+        logger.info('### TRAINING TARGET MODEL ###')
+        self.target_train()
             
         return np.mean(losses)
 
     def target_train(self):
-        self.target_train_counter = 0
         model_weights  = self.model.get_weights()
         target_weights =self.target_model.get_weights()
         for i in range(len(target_weights)):

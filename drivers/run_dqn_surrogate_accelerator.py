@@ -13,8 +13,8 @@ if __name__ == "__main__":
     ###########
     ## Train ##
     ###########
-    EPISODES = 100
-    NSTEPS   = 10
+    EPISODES = 5000
+    NSTEPS   = 45
     best_reward = -100000
 
     #######################
@@ -37,9 +37,9 @@ if __name__ == "__main__":
     #agent = DQN(env)
     agent = DQN(env,cfg='../cfg/dqn_setup.json')
     ## Save infomation ##
-    train_file_s = open("2_data_accelerator_lstm_episode%s_steps%s_batched_memories_0602420_v1.log" % (str(EPISODES),str(NSTEPS)), 'w')
+    train_file_s = open("2_data_accelerator_lstm_episode%s_steps%s_batched_memories_09022020_v1.log" % (str(EPISODES),str(NSTEPS)), 'w')
     train_writer_s = csv.writer(train_file_s, delimiter = " ")   
-    train_file_e = open("2_episode_data_accelerator_lstm_episode%s_steps%s_batched_memories_0602420_v1.log" % (str(EPISODES),str(NSTEPS)), 'w')
+    train_file_e = open("2_episode_data_accelerator_lstm_episode%s_steps%s_batched_memories_09022020_v1.log" % (str(EPISODES),str(NSTEPS)), 'w')
     train_writer_e = csv.writer(train_file_e, delimiter = " ")  
     
     for e in tqdm(range(EPISODES), desc='RL Episodes', leave=True):
@@ -51,7 +51,6 @@ if __name__ == "__main__":
         episode_loss =[]
         
         while done!=True:
-            f_remember = False
             action,policy_type = agent.action(current_state)
             next_state, reward, done, _ = env.step(action)
             agent.remember(current_state, action, reward, next_state, done)
@@ -81,7 +80,7 @@ if __name__ == "__main__":
         logger.info('total reward: %s' % str(total_reward))
         train_writer_e.writerow([e,total_reward])
         train_file_e.flush()
-        print('\ntotal reward: %s' % str(total_reward))
+        logger.info('\ntotal reward: %s' % str(total_reward))
         if total_reward > best_reward:
             agent.save('./best_episodes/dqn_lstm_data_accelerator_mse_'+str(e))
             best_reward = total_reward
