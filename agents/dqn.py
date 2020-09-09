@@ -159,11 +159,11 @@ class DQN:
         if not os.path.exists(path):os.makedirs(path)
         # Save JSON config to disk
         model_json_name = self.save_model + name + '.json'
-        json_config = self.model.to_json()
+        json_config = self.target_model.to_json()
         with open(model_json_name, 'w') as json_file:
             json_file.write(json_config)
         # Save weights to disk
-        self.model.save_weights(self.save_model + name+'.weights.h5')
-        self.model.save(self.save_model + name+'.modelall.h5')
+        self.target_model.save_weights(self.save_model + name+'.weights.h5')
+        self.target_model.save(self.save_model + name+'.modelall.h5')
         logger.info('### SAVING MODEL '+abspath+'###')
         
