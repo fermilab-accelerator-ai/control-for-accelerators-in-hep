@@ -181,6 +181,9 @@ class Surrogate_Accelerator(gym.Env):
     :return:
     '''
     logger.debug('render()')
+    render_dir = self.save_dir+'/render'
+    if not os.path.exists(save_directory):
+        os.mkdir(save_directory)
     import seaborn as sns
     sns.set_style("ticks")
     fig, axs = plt.subplots(len(self.variables), figsize=(8, 12))
@@ -204,7 +207,7 @@ class Surrogate_Accelerator(gym.Env):
       '''
     #plt.show()
     #print(os.getcwd() )
-    plt.savefig(self.save_dir+'/render/episode{}_step{}_v1.png'.format(self.episodes,self.steps))
+    plt.savefig(render_dir + '/episode{}_step{}_v1.png'.format(self.episodes,self.steps))
     plt.close('all')
     #plt.close()
 
