@@ -46,7 +46,7 @@ class DQN:
         self.batch_size = int(data['batch_size']) if int(data['batch_size']) else 32
         self.target_train_interval = int(data['target_train_interval']) if int(data['target_train_interval']) else 50
         self.tau = float(data['tau']) if float(data['tau']) else 1.0
-        self.save_model = data['save_model'] if str(data['save_model']) else './model'
+        self.save_model = ''#data['save_model'] if str(data['save_model']) else './model'
 
         self.model = self._build_model()
         self.target_model = self._build_model()
