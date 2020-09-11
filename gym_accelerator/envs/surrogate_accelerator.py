@@ -182,8 +182,8 @@ class Surrogate_Accelerator(gym.Env):
     '''
     logger.debug('render()')
     render_dir = self.save_dir+'/render'
-    if not os.path.exists(save_directory):
-        os.mkdir(save_directory)
+    if not os.path.exists(render_dir):
+        os.mkdir(render_dir)
     import seaborn as sns
     sns.set_style("ticks")
     fig, axs = plt.subplots(len(self.variables), figsize=(8, 12))
