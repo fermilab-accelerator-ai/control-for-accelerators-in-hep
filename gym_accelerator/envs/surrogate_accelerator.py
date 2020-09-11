@@ -19,9 +19,10 @@ np.seterr(divide='ignore', invalid='ignore')
 class Surrogate_Accelerator(gym.Env):
   def __init__(self):
 
+    self.save_dir='./'
     self.episodes = 0
     self.steps= 0
-
+    self.max_steps = 100
     ## Define boundary ##
     self.min_BIMIN = 103.1
     self.max_BIMIN = 103.6
@@ -146,11 +147,11 @@ class Surrogate_Accelerator(gym.Env):
       done = True
 
     if done:
-      penalty = 5*(3*15 - self.steps)
+      penalty = 5*(self.max_steps - self.steps)
       logger.info('penalty:{} is out of bounds'.format(penalty))
       reward -= penalty
 
-    if self.steps>=int(3*15):
+    if self.steps>=int(self.max_steps):
       done = True
 
     self.render()
@@ -203,7 +204,7 @@ class Surrogate_Accelerator(gym.Env):
       '''
     #plt.show()
     #print(os.getcwd() )
-    plt.savefig('../render/episode{}_step{}_v1.png'.format(self.episodes,self.steps))
+    plt.savefig(self.save_dir+'/render/episode{}_step{}_v1.png'.format(self.episodes,self.steps))
     plt.close('all')
     #plt.close()
 
