@@ -1,14 +1,12 @@
-import random,sys
+import random
 import numpy as np
 from collections import deque
-from keras.models import Sequential,Model
-from keras.layers import Dense,Dropout,Input,GaussianNoise,BatchNormalization
+from keras.models import Sequential, Model
+from keras.layers import Dense, Dropout, Input, GaussianNoise, BatchNormalization
 from keras.optimizers import Adam
-from keras import backend as K
-import csv,json,math,os
+import csv, json, os
 
 import tensorflow as tf
-from keras.backend.tensorflow_backend import set_session
 
 import logging
 logging.basicConfig(format='%(asctime)s - %(levelname)s - %(message)s')
@@ -44,7 +42,7 @@ class DQN:
         self.epsilon_decay = float(data['epsilon_decay']) if float(data['epsilon_decay']) else 0.995
         self.learning_rate =  float(data['learning_rate']) if float(data['learning_rate']) else  0.001
         self.batch_size = int(data['batch_size']) if int(data['batch_size']) else 32
-        self.target_train_interval = int(data['target_train_interval']) if int(data['target_train_interval']) else 50
+        self.target_train_interval = int(data['target_train_interval']) if int(data['target_train_interval']) else 1
         self.tau = float(data['tau']) if float(data['tau']) else 1.0
         self.save_model = ''#data['save_model'] if str(data['save_model']) else './model'
 
@@ -71,7 +69,7 @@ class DQN:
         h3 = Dense(56, activation='relu')(h2)
         ## Output: action ##   
         output = Dense(self.env.action_space.n,activation='linear')(h3)
-        model = Model(input=state_input, output=output)
+        model = Model(inputs=state_input, outputs=output)
         adam = Adam(lr=self.learning_rate, clipnorm=1.0, clipvalue=0.5) ## clipvalue=0.5,clipnorm=1.0,)
         model.compile(loss=tf.keras.losses.Huber(), optimizer=adam)
         model.summary()
@@ -100,7 +98,8 @@ class DQN:
         return action,policy_type
 
     def play(self,state):
-        act_values = self.target_model.predict(state)
+        np_state = np.array(state).reshape(1, len(state))
+        act_values = self.target_model.predict(np_state)
         return np.argmax(act_values[0])
 
     def train(self):
@@ -151,7 +150,7 @@ class DQN:
             self.epsilon *= self.epsilon_decay
 
     def load(self, name):
-        self.model.load_weights(name)
+        self.target_model.load_weights(name)
 
     def save(self, name):
         abspath = os.path.abspath(self.save_model + name)

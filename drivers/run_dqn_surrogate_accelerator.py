@@ -10,13 +10,17 @@ logger.setLevel(logging.INFO)
 from agents.dqn import DQN
 
 if __name__ == "__main__":
+
+    doPlay=True
+
     ###########
     ## Train ##
     ###########
     EPISODES = 250
     NSTEPS   = 100
     best_reward = -100000
-
+    if doPlay==True:
+        EPISODES=1
     #######################
     ## Setup environment ##
     #######################
@@ -35,6 +39,13 @@ if __name__ == "__main__":
     ## Setup agent ##
     #################
     agent = DQN(env,cfg='../cfg/dqn_setup.json')
+    if doPlay==True:
+        agent.load('../policy_models/results_dqn_09132020_v2/best_episodes/policy_model_e143_fnal_surrogate_dqn_mlp_episodes250_steps100_09132020.weights.h5')
+    # Save infomation #
+    timestamp='09242020'
+    save_directory='./results_dqn_{}_v2/'.format(timestamp)
+    if doPlay == True:
+        save_directory = './play_results_dqn_{}_v2/'.format(timestamp)
     # Save infomation #
     timestamp='09112020'
     save_directory='./results_dqn_{}_v1/'.format(timestamp)
@@ -57,9 +68,12 @@ if __name__ == "__main__":
 
         while done!=True:
             action,policy_type = agent.action(current_state)
+            if doPlay==True:
+                action = agent.play(current_state)
             next_state, reward, done, _ = env.step(action)
-            agent.remember(current_state, action, reward, next_state, done)
-            agent.train()
+            if doPlay!=True:
+                agent.remember(current_state, action, reward, next_state, done)
+                agent.train()
             logger.info('Current state: %s' % str(current_state))
             #logger.info('Alpha: %s' % str(current_state[16]))
             logger.info('Action: %s' % str(action))
