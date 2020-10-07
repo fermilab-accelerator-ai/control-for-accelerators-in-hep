@@ -1,6 +1,7 @@
 # -*- coding: utf-8 -*-
 import random, math, gym, time, os, logging, csv, sys
 from tqdm import tqdm
+from datetime import datetime
 
 ##
 logging.basicConfig(format='%(asctime)s - %(levelname)s - %(message)s')
@@ -8,15 +9,20 @@ logger = logging.getLogger('RL-Logger')
 logger.setLevel(logging.INFO)
 
 from agents.dqn import DQN
+#from agents.dqn_ensemble_v1 import DQN
 
 if __name__ == "__main__":
 
-    doPlay=True
+    now = datetime.now()
+    timestamp = now.strftime("D%m%d%Y-T%H%M%S")
+    print("date and time:", timestamp)
+
+    doPlay=False
 
     ###########
     ## Train ##
     ###########
-    EPISODES = 250
+    EPISODES = 500
     NSTEPS   = 100
     best_reward = -100000
     if doPlay==True:
@@ -25,8 +31,8 @@ if __name__ == "__main__":
     ## Setup environment ##
     #######################
     estart = time.time()
-    #env = gym.make('gym_accelerator:Data_Accelerator-v0')
-    env = gym.make('gym_accelerator:Surrogate_Accelerator-v0')
+    #env = gym.make('gym_accelerator:Surrogate_Accelerator-v0')
+    env = gym.make('gym_accelerator:Surrogate_Accelerator-v3')
     env._max_episode_steps=NSTEPS
     env.seed(1)
     end = time.time()
@@ -38,17 +44,17 @@ if __name__ == "__main__":
     #################
     ## Setup agent ##
     #################
-    agent = DQN(env,cfg='../cfg/dqn_setup.json')
+    agent = DQN(env)
+    #nmodels=10
+    #agent = DQN(env,cfg='../cfg/dqn_setup.json',nmodels=nmodels)
+    #agent.do_mode = True
     if doPlay==True:
         agent.load('../policy_models/results_dqn_09132020_v2/best_episodes/policy_model_e143_fnal_surrogate_dqn_mlp_episodes250_steps100_09132020.weights.h5')
     # Save infomation #
-    timestamp='09242020'
-    save_directory='./results_dqn_{}_v2/'.format(timestamp)
+    save_directory='./results_dqn_surrogate3_{}_v1/'.format(timestamp)
     if doPlay == True:
-        save_directory = './play_results_dqn_{}_v2/'.format(timestamp)
+        save_directory = './play_results_dqn_surrogate3_{}_v1/'.format(timestamp)
     # Save infomation #
-    timestamp='09112020'
-    save_directory='./results_dqn_{}_v1/'.format(timestamp)
     if not os.path.exists(save_directory):
         os.mkdir(save_directory)
     env.save_dir=save_directory
