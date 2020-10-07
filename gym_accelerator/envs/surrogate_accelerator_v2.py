@@ -16,7 +16,7 @@ logger.setLevel(logging.INFO)
 
 np.seterr(divide='ignore', invalid='ignore')
         
-class Surrogate_Accelerator(gym.Env):
+class Surrogate_Accelerator_v2(gym.Env):
   def __init__(self):
 
     self.save_dir='./'
@@ -26,46 +26,48 @@ class Surrogate_Accelerator(gym.Env):
     ## Define boundary ##
     self.min_BIMIN = 103.1
     self.max_BIMIN = 103.6
-    #self.max_IMINER = 1
-    #self.variables = ['B:VIMIN', 'B:IMINER', 'B:LINFRQ', 'I:IB', 'I:MDAT40']
-    #self.nbatches = 0
-    #self.nsamples = 0
 
     ## Load surrogate models ##
-    self.booster_model = keras.models.load_model('../surrogate_models/model_booster_adam256_e350_bs99_nsteps250k.h5')
-    self.injector_model = keras.models.load_model('../surrogate_models/model_injector_adam256_e350_bs99_nsteps250k.h5')
+    self.booster_model = keras.models.load_model('../surrogate_models/fullbooster_e250_bs99_nsteps250k_axis1_mmscaler_t0_D10052020-T220947_kfold4__e11_vl0.00.h5')
 
     ## Load scalers ##
 
     ## Load data to initilize the env ##
-    filename = 'MLParamData_1583906408.4261804_From_MLrn_2020-03-10+00_00_00_to_2020-03-11+00_00_00.h5_processed.csv.gz'
+    filename = 'final_310_311_data.csv'
     data = dp.load_reformated_cvs('../data/' + filename,nrows=250000)
-    self.variables = ['B:VIMIN', 'B:IMINER', 'B:LINFRQ', 'I:IB', 'I:MDAT40']
+    data['B:VIMIN'] = data['B:VIMIN'].shift(-1)
+    data['B:VIMIN_STD'] = data['B:VIMIN'].rolling(window=15).std()
+    data['B:IMINER_STD'] = data['B:IMINER'].rolling(window=15).std()
+    data = data.set_index(pd.to_datetime(data.time))
+    data = data.dropna()
+    data = data.drop_duplicates()
+
+    self.variables = ['B:VIMIN', 'B:IMINER', 'B:VIMIN_STD', 'B:IMINER_STD', 'B:LINFRQ', 'I:IB', 'I:MDAT40']
     data_list = []
+    self.scalers = []
     ## get_dataset also normalizes the data
     for v in range(len(self.variables)):
       data_list.append(self.get_dataset(data,variable=self.variables[v]))
-
-    ## TODO: Maybe we need to load the saved scalers to make sure it ok.
-    self.scalers = [data_list[0][0],data_list[1][0],data_list[2][0],data_list[3][0],data_list[4][0]]
+      self.scalers.append(data_list[v][0])
 
     # Axis
     concate_axis = 1
 
     ## data
-    self.X_train = np.concatenate((data_list[0][1], data_list[1][1], data_list[2][1], data_list[3][1], data_list[4][1]),
-                             axis=concate_axis)
-    self.Y_train = np.concatenate((data_list[0][2], data_list[1][2], data_list[2][2], data_list[3][2], data_list[4][2]),
-                             axis=1)
+    self.X_train = np.concatenate((data_list[0][1], data_list[1][1], data_list[2][1], data_list[3][1],
+                                data_list[4][1], data_list[5][1], data_list[6][1]), axis=concate_axis)
+    self.Y_train = np.concatenate((data_list[0][2], data_list[1][2]), axis=1)
+
+
     self.X_train_raw = np.copy(self.X_train)
     self.nbatches = self.X_train.shape[0]
     self.nsamples = self.X_train.shape[2]
     self.batch_id = 0 #np.random.randint(0, high=self.nbatches)
-    print('Data shape:{}'.format(self.X_train.shape))
+
     self.observation_space = spaces.Box(
       low   = 0,
       high  = +1,
-      shape = (5,),
+      shape = (7,),
       dtype = np.float64
     )
 
@@ -73,10 +75,9 @@ class Surrogate_Accelerator(gym.Env):
     self.action_space = spaces.Discrete(7)
     self.VIMIN = 0
     ##
-    self.state = np.zeros(shape=(1,5,150))
-    self.predicted_state = np.zeros(shape=(1,5,1))
+    self.state = np.zeros(shape=(1,7,150))
+    self.predicted_state = np.zeros(shape=(1,7,1))
     logger.debug('Init pred shape:{}'.format(self.predicted_state.shape))
-    #self.reset()
 
   def seed(self, seed=None):
     self.np_random, seed = seeding.np_random(seed)
@@ -108,13 +109,14 @@ class Surrogate_Accelerator(gym.Env):
     logger.debug('Step() updated VIMIN:{}'.format(self.VIMIN))
 
     logger.debug('Step() state B:VIMIN\n{}'.format(self.state[0,0,-2:1]))
+
     ## TODO: I need to shift the VIMIN data before pushing new VIMIN
     self.state[ 0, 0, -1:] = self.VIMIN
     logger.debug('Step() state with Updated action on B:VIMIN\n{}'.format(self.state[0,0,-2:1]))
 
     ## Step 2: Predict using booster model
     self.predicted_state = self.booster_model.predict(self.state)
-    self.predicted_state = self.predicted_state.reshape(1, 5, 1)
+    self.predicted_state = self.predicted_state.reshape(1, 2, 1)
 
     ## Step 3: Update IMINER and LINFQN
     #print(self.state.shape)
@@ -124,25 +126,27 @@ class Surrogate_Accelerator(gym.Env):
     #print(self.state.shape)
 
     ## Predict the injector variables
-    injector_input = self.state[0,3:5,:].reshape(1,2,150)
-    injector_prediction = self.injector_model.predict(injector_input).reshape(1,2,1)
+    #injector_input = self.state[0,3:5,:].reshape(1,2,150)
+    #injector_prediction = self.injector_model.predict(injector_input).reshape(1,2,1)
 
-    logger.debug('Step() state with pre-injector state model\n{}'.format(self.state[0,:,-2:]))
-    logger.debug('Step() state with injector state model shape\n{}'.format(injector_prediction.shape))
-    #self.state[0, 3:5, -1:] = injector_prediction[0,:]
-    logger.debug('Step() state with updated injector state model\n{}'.format(self.state[0,:,-2:]))
+    #logger.debug('Step() state with pre-injector state model\n{}'.format(self.state[0,:,-2:]))
+    #logger.debug('Step() state with injector state model shape\n{}'.format(injector_prediction.shape))
+    ##self.state[0, 3:5, -1:] = injector_prediction[0,:]
+    #logger.debug('Step() state with updated injector state model\n{}'.format(self.state[0,:,-2:]))
 
     ## Step 4: Shift state by one step and update last time stamp using predictions
     self.state[0, :, 0:-1] = self.state[ 0, :, 1:]
-    ## Update IMINER and LINFQN
-    self.state[0, 1:3, -1:] = self.predicted_state[0,1:3]
+
+    ## Update IMINER
+    self.state[0, 1:2, -1:] = self.predicted_state[0,1:2]
     ## Update injector variables
-    self.state[0, 3:5, -1:] = injector_prediction[0,:]
+    #self.state[0, 3:5, -1:] = injector_prediction[0,:]
 
     ## Update data state for rendering
-    self.data_state = np.copy(self.X_train[self.batch_id+self.steps].reshape(1, 5, 150))
-    ## Use data for everything but the B:IMINER prediction
-    self.state[0, 2:5,:] = self.data_state[0, 2:5,:]
+    self.data_state = np.copy(self.X_train[self.batch_id+self.steps].reshape(1, 7, 150))
+
+    ## Use data for everything but the B:IMINER prediction ##
+    self.state[0, 2:7,:] = self.data_state[0, 2:7,:]
 
     iminer = self.predicted_state[0,1]
     logger.debug('norm iminer:{}'.format(iminer))
@@ -163,6 +167,7 @@ class Surrogate_Accelerator(gym.Env):
 
     self.render()
 
+    #print(self.state[0,:,-1:])
     return self.state[0,:,-1:].flatten(), np.asscalar(reward), done, {}
   
   def reset(self):
@@ -174,9 +179,9 @@ class Surrogate_Accelerator(gym.Env):
     self.batch_id=0
     #self.state = np.zeros(shape=(1,5,150))
     logger.debug('self.state:{}'.format(self.state))
-    self.state = np.copy(self.X_train[self.batch_id].reshape(1,5,150))
+    self.state = np.copy(self.X_train[self.batch_id].reshape(1,7,150))
     ## Copy as data to keep track of what the true accelerator did
-    self.data_state = np.copy(self.X_train[self.batch_id].reshape(1,5,150))
+    self.data_state = np.copy(self.X_train[self.batch_id].reshape(1,7,150))
     logger.debug('self.state:{}'.format(self.state))
     logger.debug('reset_data.shape:{}'.format(self.state.shape))
     self.VIMIN = self.state[0,0,-1:]
@@ -215,7 +220,7 @@ class Surrogate_Accelerator(gym.Env):
     for v in range(0,nvars):#len(self.variables)):
       utrace = self.state[0, v, :]
       trace  = self.scalers[v].inverse_transform(utrace.reshape(-1, 1))
-      axs[v].plot(trace, label='Replay')
+      axs[v].plot(trace, label='RL Action')
       #if v==1:
       data_utrace = self.data_state[0, v, :]
       data_trace = self.scalers[v].inverse_transform(data_utrace.reshape(-1, 1))
@@ -239,6 +244,7 @@ class Surrogate_Accelerator(gym.Env):
     #print(os.getcwd() )
     plt.savefig(render_dir + '/episode{}_step{}_v1.png'.format(self.episodes,self.steps))
     plt.close('all')
+
     #plt.close()
 
   def create_dataset(self, dataset, look_back=10*15, look_forward=1):
@@ -255,7 +261,7 @@ class Surrogate_Accelerator(gym.Env):
     dataset = df[variable].values  # numpy.ndarray
     dataset = dataset.astype('float32')
     dataset = np.reshape(dataset, (-1, 1))
-    scaler = MinMaxScaler(feature_range=(0, 1))
+    scaler = MinMaxScaler(feature_range=(0.0001, 1))
     dataset = scaler.fit_transform(dataset)
 
     ## TODO: Fix
