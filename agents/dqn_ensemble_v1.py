@@ -82,7 +82,7 @@ class DQN:
         h3 = Dense(56, activation='relu')(h2)
         ## Output: action ##   
         output = Dense(self.env.action_space.n,activation='linear')(h3)
-        model = Model(input=state_input, output=output)
+        model = Model(inputs=state_input, outputs=output)
         adam = Adam(lr=self.learning_rate)#, clipnorm=1.0, clipvalue=0.5) ## clipvalue=0.5,clipnorm=1.0,)
         model.compile(loss='mse', optimizer=adam)
         model.summary()
