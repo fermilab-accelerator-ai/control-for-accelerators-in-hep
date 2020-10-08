@@ -1,6 +1,7 @@
 # -*- coding: utf-8 -*-
 import random, math, gym, time, os, logging, csv, sys
 from tqdm import tqdm
+from datetime import datetime
 
 ##
 logging.basicConfig(format='%(asctime)s - %(levelname)s - %(message)s')
@@ -10,6 +11,11 @@ logger.setLevel(logging.INFO)
 from agents.dqn_ensemble_v1 import DQN
 
 if __name__ == "__main__":
+
+    now = datetime.now()
+    timestamp = now.strftime("D%m%d%Y-T%H%M%S")
+    print("date and time:", timestamp)
+
     ###########
     ## Train ##
     ###########
@@ -22,7 +28,8 @@ if __name__ == "__main__":
     #######################
     estart = time.time()
     #env = gym.make('gym_accelerator:Data_Accelerator-v0')
-    env = gym.make('gym_accelerator:Surrogate_Accelerator-v0')
+    #env = gym.make('gym_accelerator:Surrogate_Accelerator-v0')
+    env = gym.make('gym_accelerator:Surrogate_Accelerator-v3')
     env._max_episode_steps=NSTEPS
     env.seed(1)
     end = time.time()
@@ -34,15 +41,14 @@ if __name__ == "__main__":
     #################
     ## Setup agent ##
     #################
-    nmodels=5
+    nmodels=10
     agent = DQN(env,cfg='../cfg/dqn_setup.json',nmodels=nmodels)
-    timestamp='09132020'
-    save_directory='./results_dqn_ensemble1_nmodels{}_{}_v1/'.format(nmodels,timestamp)
+    save_directory='./results_dqn_surrogatev3_ensemble1_nmodels{}_{}_v1/'.format(nmodels,timestamp)
     if not os.path.exists(save_directory):
         os.mkdir(save_directory)
     env.save_dir=save_directory
     ## Save infomation ##
-    safe_file_prefix = 'fnal_surrogate_dqn_ensemble1_nmodels{}_mlp_episodes{}_steps{}_09092020b'.format(nmodels,EPISODES,NSTEPS)
+    safe_file_prefix = 'fnal_surrogatev3_dqn_ensemble1_nmodels{}_mlp_episodes{}_steps{}_{}'.format(nmodels,EPISODES,NSTEPS,timestamp)
     train_file_s = open(save_directory+safe_file_prefix+'_batched_memories.log','w')
     train_writer_s = csv.writer(train_file_s, delimiter = " ")
     train_file_e = open(save_directory+safe_file_prefix+'_reduced_batched_memories.log','w')
