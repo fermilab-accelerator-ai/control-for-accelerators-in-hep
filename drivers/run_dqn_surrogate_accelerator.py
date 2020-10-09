@@ -22,7 +22,7 @@ if __name__ == "__main__":
     ###########
     ## Train ##
     ###########
-    EPISODES = 500
+    EPISODES = 50
     NSTEPS   = 100
     best_reward = -100000
     if doPlay==True:
@@ -51,7 +51,7 @@ if __name__ == "__main__":
     if doPlay==True:
         agent.load('../policy_models/results_dqn_09132020_v2/best_episodes/policy_model_e143_fnal_surrogate_dqn_mlp_episodes250_steps100_09132020.weights.h5')
     # Save infomation #
-    save_directory='./results_dqn_surrogate3_{}_v1/'.format(timestamp)
+    save_directory='./results_dqn_surrogate3d_{}_v1/'.format(timestamp)
     if doPlay == True:
         save_directory = './play_results_dqn_surrogate3_{}_v1/'.format(timestamp)
     # Save infomation #

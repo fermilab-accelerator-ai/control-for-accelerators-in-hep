@@ -19,7 +19,7 @@ if __name__ == "__main__":
     ###########
     ## Train ##
     ###########
-    EPISODES = 500
+    EPISODES = 50
     NSTEPS   = 100
     best_reward = -100000
 
@@ -41,14 +41,14 @@ if __name__ == "__main__":
     #################
     ## Setup agent ##
     #################
-    nmodels=10
+    nmodels=5
     agent = DQN(env,cfg='../cfg/dqn_setup.json',nmodels=nmodels)
-    save_directory='./results_dqn_surrogatev3_ensemble1_nmodels{}_{}_v1/'.format(nmodels,timestamp)
+    save_directory='./results_surrogatev3d_dqn_ensemble1_nmodels{}_{}_v1/'.format(nmodels,timestamp)
     if not os.path.exists(save_directory):
         os.mkdir(save_directory)
     env.save_dir=save_directory
     ## Save infomation ##
-    safe_file_prefix = 'fnal_surrogatev3_dqn_ensemble1_nmodels{}_mlp_episodes{}_steps{}_{}'.format(nmodels,EPISODES,NSTEPS,timestamp)
+    safe_file_prefix = 'fnal_surrogate_dqn_ensemble1_nmodels{}_mlp_episodes{}_steps{}_{}'.format(nmodels,EPISODES,NSTEPS,timestamp)
     train_file_s = open(save_directory+safe_file_prefix+'_batched_memories.log','w')
     train_writer_s = csv.writer(train_file_s, delimiter = " ")
     train_file_e = open(save_directory+safe_file_prefix+'_reduced_batched_memories.log','w')

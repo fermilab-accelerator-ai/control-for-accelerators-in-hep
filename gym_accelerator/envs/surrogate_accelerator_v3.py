@@ -1,4 +1,5 @@
 import random, gym, os
+import math
 from gym import spaces
 from gym.utils import seeding
 import numpy as np
@@ -70,7 +71,7 @@ class Surrogate_Accelerator_v3(gym.Env):
       dtype = np.float64
     )
 
-    self.actionMap_VIMIN = [0, 0.0001, 0.005, 0.001 , -0.0001,-0.005, -0.001]
+    self.actionMap_VIMIN = [0, 0.005, -0.005, 0.01, -0.01, 0.025, -0.025]
     self.action_space = spaces.Discrete(7)
     self.VIMIN = 0
     ##
@@ -85,7 +86,10 @@ class Surrogate_Accelerator_v3(gym.Env):
   def step(self,action):
     self.steps += 1
     logger.info('Episode/State: {}/{}'.format(self.episodes,self.steps))
-    done = False
+
+    reward = None
+    done   = False
+    info   = ''
 
     ''' Steps:
       1) Update VIMIN based on action
@@ -102,12 +106,15 @@ class Surrogate_Accelerator_v3(gym.Env):
     logger.debug('Step() descaled VIMIN:{}'.format(DENORN_BVIMIN))
     if DENORN_BVIMIN < self.min_BIMIN or DENORN_BVIMIN > self.max_BIMIN:
       logger.info('Step() descaled VIMIN:{} is out of bounds.'.format(DENORN_BVIMIN))
-      done = True
+      DENORN_BVIMIN -= delta_VIMIN
+
 
     self.VIMIN = self.scalers[0].transform(DENORN_BVIMIN)
     logger.debug('Step() updated VIMIN:{}'.format(self.VIMIN))
-
     logger.debug('Step() state B:VIMIN\n{}'.format(self.state[0,0,-2:1]))
+
+    ## Save previous iminer
+    norm_preiminer = self.state[0, 1:2, -1:]
 
     ## Shift
     self.state[ 0, 0, -1:] = self.VIMIN
@@ -138,20 +145,24 @@ class Surrogate_Accelerator_v3(gym.Env):
 
     ## Update IMINER
     self.state[0, 1:2, -1:] = self.predicted_state[0,1:2]
+
     ## Update injector variables
     #self.state[0, 3:5, -1:] = injector_prediction[0,:]
 
     ## Update data state for rendering
     self.data_state = np.copy(self.X_train[self.batch_id+self.steps].reshape(1, len(self.variables), 150))
+    #data_reward = -abs(self.data_state[0, 1:2,-1:])
 
     ## Use data for everything but the B:IMINER prediction ##
     self.state[0, 2:len(self.variables),:] = self.data_state[0, 2:len(self.variables),:]
 
-    iminer = self.predicted_state[0,1]
-    logger.debug('norm iminer:{}'.format(iminer))
-    iminer = self.scalers[1].inverse_transform(np.array([iminer]).reshape(1, -1))
-    logger.debug('iminer:{}'.format(iminer))
-    reward = -abs(iminer)
+    norm_iminer = self.predicted_state[0,1]
+    logger.debug('norm iminer:{}'.format(norm_iminer))
+    iminer = self.scalers[1].inverse_transform(np.array([norm_iminer]).reshape(1, -1))
+    preiminer = self.scalers[1].inverse_transform(np.array([norm_preiminer]).reshape(1, -1))
+    logger.debug('preiminer/iminer:{}/{}'.format(preiminer,iminer))
+    reward = -1 + 1.*math.exp(-5*abs(np.asscalar(iminer)))
+    #reward = -abs(iminer)
     if abs(iminer) >= 2:
       logger.info('iminer:{} is out of bounds'.format(iminer))
       done = True
@@ -164,12 +175,13 @@ class Surrogate_Accelerator_v3(gym.Env):
     if self.steps>=int(self.max_steps):
       done = True
 
-    self.total_reward += np.asscalar(reward)
+    self.total_reward += reward #np.asscalar(reward)
 
     self.render()
 
     #print(self.state[0,:,-1:])
-    return self.state[0,:,-1:].flatten(), np.asscalar(reward), done, {}
+    #return self.state[0,:,-1:].flatten(), np.asscalar(reward), done, info
+    return self.state[0,:,-1:].flatten(), reward, done, info
   
   def reset(self):
     self.episodes += 1
