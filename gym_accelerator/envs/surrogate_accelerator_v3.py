@@ -18,6 +18,8 @@ logger.setLevel(logging.INFO)
 np.seterr(divide='ignore', invalid='ignore')
         
 class Surrogate_Accelerator_v3(gym.Env):
+  batch_id: int
+
   def __init__(self):
 
     self.save_dir='./'
@@ -37,7 +39,7 @@ class Surrogate_Accelerator_v3(gym.Env):
     ## Load data ##
     filename = '310_11_more_params.csv'
     data = dp.load_reformated_cvs('../data/' + filename,nrows=250000)
-    data['B:VIMIN'] = data['B:VIMIN'].shift(-1)
+    #data['B:VIMIN'] = data['B:VIMIN'].shift(-1)
     data = data.set_index(pd.to_datetime(data.time))
     data = data.dropna()
     data = data.drop_duplicates()
@@ -57,27 +59,26 @@ class Surrogate_Accelerator_v3(gym.Env):
 
     ## data
     self.X_train = np.concatenate(x_train, axis=concate_axis)
-    self.Y_train = np.concatenate((data_list[0][2], data_list[1][2]), axis=1)
-
     self.X_train_raw = np.copy(self.X_train)
     self.nbatches = self.X_train.shape[0]
     self.nsamples = self.X_train.shape[2]
     self.batch_id = 0 #np.random.randint(0, high=self.nbatches)
 
+    self.nobs_states = len(self.variables)-2
     self.observation_space = spaces.Box(
       low   = 0,
       high  = +1,
-      shape = (len(self.variables),),
+      shape = (self.nobs_states,),
       dtype = np.float64
     )
 
-    self.actionMap_VIMIN = [0, 0.005, -0.005, 0.01, -0.01, 0.025, -0.025]
-    self.action_space = spaces.Discrete(7)
+    self.actionMap_VIMIN = [0, 0.005, -0.005, 0.01, -0.01, 0.02, -0.02]
+    self.action_space = spaces.Discrete(len(self.actionMap_VIMIN))
     self.VIMIN = 0
-    ##
-    self.state = np.zeros(shape=(1,len(self.variables),150))
-    self.predicted_state = np.zeros(shape=(1,len(self.variables),1))
-    logger.debug('Init pred shape:{}'.format(self.predicted_state.shape))
+    ## Input states for the Booster model
+    self.state = np.zeros(shape=(1,self.nobs_states,self.nsamples))
+    ## Booster model predicted states
+    self.predicted_state = np.zeros(shape=(1,2,1))
 
   def seed(self, seed=None):
     self.np_random, seed = seeding.np_random(seed)
@@ -99,70 +100,49 @@ class Surrogate_Accelerator_v3(gym.Env):
     '''
 
     ## Step 1: Calculate the new B:VINMIN based on policy action
-    logger.info('Step() before action VIMIN:{}'.format(self.VIMIN))
+    logger.info('Step() scaled VIMIN before action :{}'.format(self.VIMIN))
     delta_VIMIN = self.actionMap_VIMIN[action]
     DENORN_BVIMIN = self.scalers[0].inverse_transform(np.array([self.VIMIN ]).reshape(1, -1))
+    logger.debug('Step() descaled before action VIMIN:{}'.format(DENORN_BVIMIN))
     DENORN_BVIMIN += delta_VIMIN
-    logger.debug('Step() descaled VIMIN:{}'.format(DENORN_BVIMIN))
+    logger.debug('Step() descaled after action VIMIN:{}'.format(DENORN_BVIMIN))
     if DENORN_BVIMIN < self.min_BIMIN or DENORN_BVIMIN > self.max_BIMIN:
       logger.info('Step() descaled VIMIN:{} is out of bounds.'.format(DENORN_BVIMIN))
       DENORN_BVIMIN -= delta_VIMIN
 
-
     self.VIMIN = self.scalers[0].transform(DENORN_BVIMIN)
-    logger.debug('Step() updated VIMIN:{}'.format(self.VIMIN))
-    logger.debug('Step() state B:VIMIN\n{}'.format(self.state[0,0,-2:1]))
+    logger.info('Step() scaled VIMIN after action:{}'.format(self.VIMIN))
 
-    ## Save previous iminer
-    norm_preiminer = self.state[0, 1:2, -1:]
-
-    ## Shift
-    self.state[ 0, 0, -1:] = self.VIMIN
-    logger.debug('Step() state with updated action on B:VIMIN\n{}'.format(self.state[0,0,-2:1]))
+    ## Shift and update value
+    logger.debug('State with pre-updated action on B:VIMIN: {}'.format(self.state[0,0,:]))
+    self.state[0,0,0:self.nsamples-1] = self.state[0,0,1:self.nsamples]
+    self.state[0][0][self.nsamples-1] = np.asscalar(self.VIMIN)
+    #logger.debug('Step() state with updated action on B:VIMIN: {}'.format(self.state[0][0][self.nsamples-1]))
+    logger.debug('State with updated action on B:VIMIN: {}'.format(self.state[0,0,:]))
 
     ## Step 2: Predict using booster model
     self.predicted_state = self.booster_model.predict(self.state)
     self.predicted_state = self.predicted_state.reshape(1, 2, 1)
 
-    ## Step 3: Update IMINER and LINFQN
-    #print(self.state.shape)
-    #logger.debug('Step() state with pre-state model\n{}'.format(self.state[0,:,-2:]))
-    #self.state[0, 1:3, -1:] = self.predicted_state[0,1:3]
-    #logger.debug('Step() state with updated state model\n{}'.format(self.state[0,:,-2:]))
-    #print(self.state.shape)
+    ## Shift and update value
+    self.state[0,1,0:self.nsamples-1] = self.state[0,1,1:self.nsamples]
+    self.state[0][1][self.nsamples-1] = self.predicted_state[0,1,0]
 
-    ## Predict the injector variables
-    #injector_input = self.state[0,3:5,:].reshape(1,2,150)
-    #injector_prediction = self.injector_model.predict(injector_input).reshape(1,2,1)
+    ## Get raw data for the other variables
+    self.data_state = np.copy(self.X_train[self.batch_id+self.steps].reshape(1, len(self.variables), self.nsamples))
 
-    #logger.debug('Step() state with pre-injector state model\n{}'.format(self.state[0,:,-2:]))
-    #logger.debug('Step() state with injector state model shape\n{}'.format(injector_prediction.shape))
-    ##self.state[0, 3:5, -1:] = injector_prediction[0,:]
-    #logger.debug('Step() state with updated injector state model\n{}'.format(self.state[0,:,-2:]))
-
-    ## Step 4: Shift state by one step and update last time stamp using predictions
-    self.state[0, :, 0:-1] = self.state[ 0, :, 1:]
-
-    ## Update IMINER
-    self.state[0, 1:2, -1:] = self.predicted_state[0,1:2]
-
-    ## Update injector variables
-    #self.state[0, 3:5, -1:] = injector_prediction[0,:]
-
-    ## Update data state for rendering
-    self.data_state = np.copy(self.X_train[self.batch_id+self.steps].reshape(1, len(self.variables), 150))
-    #data_reward = -abs(self.data_state[0, 1:2,-1:])
-
-    ## Use data for everything but the B:IMINER prediction ##
+    ## Update entries for everything but the B:VIMIN & B:IMINER  ##
     self.state[0, 2:len(self.variables),:] = self.data_state[0, 2:len(self.variables),:]
 
+    ## Calculate the reward using B:IMINER
     norm_iminer = self.predicted_state[0,1]
     logger.debug('norm iminer:{}'.format(norm_iminer))
     iminer = self.scalers[1].inverse_transform(np.array([norm_iminer]).reshape(1, -1))
-    preiminer = self.scalers[1].inverse_transform(np.array([norm_preiminer]).reshape(1, -1))
-    logger.debug('preiminer/iminer:{}/{}'.format(preiminer,iminer))
-    reward = -1 + 1.*math.exp(-5*abs(np.asscalar(iminer)))
-    #reward = -abs(iminer)
+
+    #preiminer = self.scalers[1].inverse_transform(np.array([norm_preiminer]).reshape(1, -1))
+    #logger.debug('preiminer/iminer:{}/{}'.format(preiminer,iminer))
+    #reward = -1 + 1.*math.exp(-5*abs(np.asscalar(iminer)))
+    reward = -abs(iminer)
     if abs(iminer) >= 2:
       logger.info('iminer:{} is out of bounds'.format(iminer))
       done = True
@@ -175,14 +155,16 @@ class Surrogate_Accelerator_v3(gym.Env):
     if self.steps>=int(self.max_steps):
       done = True
 
-    self.total_reward += reward #np.asscalar(reward)
+    self.total_reward += np.asscalar(reward)
 
     self.render()
 
-    #print(self.state[0,:,-1:])
-    #return self.state[0,:,-1:].flatten(), np.asscalar(reward), done, info
-    return self.state[0,:,-1:].flatten(), reward, done, info
+    ## Observation state include everything by the action and reward variables
+    observation_state = self.state[0,2:,-1].flatten()
+    logger.info('Observation state shape: {}'.format(observation_state.shape))
+    return observation_state, np.asscalar(reward), done, info
   
+  @property
   def reset(self):
     self.episodes += 1
     self.steps = 0
@@ -190,29 +172,26 @@ class Surrogate_Accelerator_v3(gym.Env):
     ## Prepare the random sample ##
     #self.batch_id = np.random.randint(0, high=self.nbatches)
     logger.info('Resetting env')
-    self.batch_id=0
-    #self.state = np.zeros(shape=(1,5,150))
-    logger.debug('self.state:{}'.format(self.state))
+    self.batch_id=10
+    #logger.debug('self.state:{}'.format(self.state))
     self.state = None
-    self.state = np.copy(self.X_train[self.batch_id].reshape(1,len(self.variables),150))
+    self.state = np.copy(self.X_train[self.batch_id].reshape(1,len(self.variables),self.nsamples))
     self.min_BIMIN = self.scalers[0].inverse_transform(self.state[:,0,:]).min()
     self.max_BIMIN = self.scalers[0].inverse_transform(self.state[:,0,:]).max()
     logger.info('Lower and upper B:VIMIN: [{},{}]'.format(self.min_BIMIN,self.max_BIMIN))
     self.min_BIMIN = self.min_BIMIN*0.9999
     self.max_BIMIN = self.max_BIMIN*1.0001
     logger.info('Lower and upper controls: [{},{}]'.format(self.min_BIMIN,self.max_BIMIN))
-
-
     ## Copy as data to keep track of what the true accelerator did
     self.data_state = None
-    self.data_state = np.copy(self.X_train[self.batch_id].reshape(1,len(self.variables),150))
-    logger.debug('self.state:{}'.format(self.state))
-    logger.debug('reset_data.shape:{}'.format(self.state.shape))
-    self.VIMIN = self.state[0,0,-1:]
+    self.data_state = np.copy(self.X_train[self.batch_id].reshape(1,len(self.variables),self.nsamples))
+    #logger.debug('self.state:{}'.format(self.state))
+    #logger.debug('reset_data.shape:{}'.format(self.state.shape))
+    self.VIMIN = self.state[0][0][self.nsamples-1]
     logger.debug('Normed VIMIN:{}'.format(self.VIMIN))
     logger.debug('B:VIMIN:{}'.format(self.scalers[0].inverse_transform(np.array([self.VIMIN]).reshape(1, -1))))
-
-    return self.state[0,:,-1:]
+    observation_state = self.state[0, 2:, -1].flatten()
+    return observation_state
 
   def render(self):
     '''
@@ -240,7 +219,7 @@ class Surrogate_Accelerator_v3(gym.Env):
     fig, axs = plt.subplots(nvars , figsize=(8, 8))
     start_trace =0
     end_trace   =0
-    logger.debug('self.state:{}'.format(self.state))
+    #logger.debug('self.state:{}'.format(self.state))
     for v in range(0,nvars):#len(self.variables)):
       utrace = self.state[0, v, :]
       trace  = self.scalers[v].inverse_transform(utrace.reshape(-1, 1))
