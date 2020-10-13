@@ -1,5 +1,6 @@
 from gym_accelerator.envs.data_accelerator import Data_Accelerator
 from gym_accelerator.envs.emulator_accelerator import Emulator_Accelerator
 from gym_accelerator.envs.surrogate_accelerator import Surrogate_Accelerator
+from gym_accelerator.envs.surrogate_accelerator_v1 import Surrogate_Accelerator_v1
 from gym_accelerator.envs.surrogate_accelerator_v2 import Surrogate_Accelerator_v2
 from gym_accelerator.envs.surrogate_accelerator_v3 import Surrogate_Accelerator_v3

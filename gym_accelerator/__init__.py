@@ -16,6 +16,11 @@ register(
 )
 
 register(
+    id='Surrogate_Accelerator-v1',
+    entry_point='gym_accelerator.envs:Surrogate_Accelerator_v1',
+)
+
+register(
     id='Surrogate_Accelerator-v2',
     entry_point='gym_accelerator.envs:Surrogate_Accelerator_v2',
 )
