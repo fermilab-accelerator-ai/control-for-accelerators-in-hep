@@ -23,7 +23,9 @@ class DQN:
 
         self.total_actions_taken = 1
         self.individual_action_taken = np.ones(self.env.action_space.n)
-            
+        logger.info('Agent action space:{}'.format(self.env.action_space.n))
+        logger.info('Agent state space:{}'.format(self.env.observation_space.shape))
+
         ## Setup GPU cfg
         #config = tf.ConfigProto()
         #config.gpu_options.allow_growth = True
@@ -60,17 +62,17 @@ class DQN:
         ## Make noisy input data ##
         #state_input = GaussianNoise(0.1)(state_input)
         ## Noisy layer 
-        h1 = Dense(56, activation='relu')(state_input)
+        h1 = Dense(128, activation='relu')(state_input)
         #h1 = GaussianNoise(0.1)(h1)
         ## Noisy layer
-        h2 = Dense(56, activation='relu')(h1)
+        h2 = Dense(128, activation='relu')(h1)
         #h2 = GaussianNoise(0.1)(h2)
         ## Output layer
-        h3 = Dense(56, activation='relu')(h2)
+        h3 = Dense(128, activation='relu')(h2)
         ## Output: action ##   
         output = Dense(self.env.action_space.n,activation='linear')(h3)
         model = Model(inputs=state_input, outputs=output)
-        adam = Adam(lr=self.learning_rate, clipnorm=1.0, clipvalue=0.5) ## clipvalue=0.5,clipnorm=1.0,)
+        adam = Adam(lr=self.learning_rate, clipnorm=1.0, clipvalue=0.5)
         model.compile(loss=tf.keras.losses.Huber(), optimizer=adam)
         model.summary()
         return model       
@@ -118,6 +120,8 @@ class DQN:
             if not done:
                 expectedQ = self.gamma*np.amax(self.target_model.predict(np_next_state)[0])
             target = reward + expectedQ
+            #print(type(state))
+            #print(type(np_state))
             target_f = self.target_model.predict(np_state)
             target_f[0][action] = target
             

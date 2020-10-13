@@ -11,6 +11,8 @@ from keras.models import Model
 from keras.optimizers import Adam
 from scipy import stats
 
+import tensorflow as tf
+
 # import tensorflow as tf
 # from keras.backend.tensorflow_backend import set_session
 logging.basicConfig(format='%(asctime)s - %(levelname)s - %(message)s')
@@ -49,6 +51,8 @@ class DQN:
         self.batch_size = int(data['batch_size']) if int(data['batch_size']) else 32
         #self.target_train_interval = int(data['target_train_interval']) if int(data['target_train_interval']) else 50
         self.tau = float(data['tau']) if float(data['tau']) else 1.0
+        self.warmup_step = float(data['warmup_step']) if float(data['warmup_step']) else 100
+
         self.save_model = ''#data['save_model'] if str(data['save_model']) else './model'
 
         self.nmodels = nmodels
@@ -63,28 +67,22 @@ class DQN:
             self.last_loss.append(100)
 
         ## Save infomation ##
-        train_file_name = "dqn_emsemble_lr%s_v1.log" % str(self.learning_rate)
-        self.train_file = open(train_file_name, 'w')
-        self.train_writer = csv.writer(self.train_file, delimiter = " ")
+        #train_file_name = "dqn_emsemble_lr%s_v1.log" % str(self.learning_rate)
+        #self.train_file = open(train_file_name, 'w')
+        #self.train_writer = csv.writer(self.train_file, delimiter = " ")
 
     def _build_model(self):
         ## Input: state ##       
         state_input = Input(self.env.observation_space.shape)
-        ## Make noisy input data ##
-        #state_input = GaussianNoise(0.1)(state_input)
-        ## Noisy layer 
-        h1 = Dense(56, activation='relu')(state_input)
-        #h1 = GaussianNoise(0.1)(h1)
-        ## Noisy layer
-        h2 = Dense(56, activation='relu')(h1)
-        #h2 = GaussianNoise(0.1)(h2)
-        ## Output layer
-        h3 = Dense(56, activation='relu')(h2)
+        h1 = Dense(128, activation='relu')(state_input)
+        h2 = Dense(128, activation='relu')(h1)
+        h3 = Dense(128, activation='relu')(h2)
         ## Output: action ##   
         output = Dense(self.env.action_space.n,activation='linear')(h3)
+        ##
         model = Model(inputs=state_input, outputs=output)
-        adam = Adam(lr=self.learning_rate)#, clipnorm=1.0, clipvalue=0.5) ## clipvalue=0.5,clipnorm=1.0,)
-        model.compile(loss='mse', optimizer=adam)
+        adam = Adam(lr=self.learning_rate, clipnorm=1.0, clipvalue=0.5)
+        model.compile(loss=tf.keras.losses.Huber(), optimizer=adam)
         model.summary()
         return model       
 
@@ -94,7 +92,7 @@ class DQN:
     def action(self, state):
         action = 0
         policy_type = 0
-        if np.random.rand() <= self.epsilon:
+        if np.random.rand() <= self.epsilon or len(self.memory)<(self.warmup_step):
             logger.info('Random action')
             action = random.randrange(self.env.action_space.n)
             ## Update randomness
@@ -110,14 +108,17 @@ class DQN:
             print('act_values_list:{}'.format(act_values_list))
             act_values = np.mean(act_values_list, axis=0)
             act_stds = np.std(act_values_list, axis=0)
-            act_modes = stats.mode(act_values_list)
+            act_modes, counts = stats.mode(act_values_list)
+            #act_2sigma = act_values+2*act_stds
             #act_values = []
             #act_stds = []
             #for a in range(self.env.action_space.n):
             #    act_values.append(np.array(act_values_list[a]).mean())
             #    act_stds.append(np.array(act_values_list[a]).std())
-            print('action value/mode/std: {}/{}/{}'.format(act_values,act_modes,act_stds))
-            action = np.argmax(act_values)
+#            print('action value/mode/std: {}/{}/{}'.format(act_values,act_modes,act_stds))
+            print('action value/std/mode: {}/{}/{}'.format(act_values,act_stds,act_modes))
+            #action = np.argmax(act_values)
+            action = np.argmax(act_modes)
             if self.do_mode:
                 action = np.argmax(act_modes)
             policy_type=1
@@ -159,8 +160,8 @@ class DQN:
             current_loss = history.history['loss'][0]
             print('Loss for model[{}] {}'.format(m,current_loss))
             losses.append(history.history['loss'][0])
-            self.train_writer.writerow([np.mean(losses)])
-            self.train_file.flush()
+            #self.train_writer.writerow([np.mean(losses)])
+            #self.train_file.flush()
         
             #if current_loss<3*self.last_loss[m]:
             print('### TRAINING TARGET MODEL ###')
