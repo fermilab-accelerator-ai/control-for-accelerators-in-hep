@@ -7,8 +7,8 @@ import numpy as np
 import tensorflow as tf
 
 from collections import deque
-from keras.models import Model
-from keras.layers import Dense, Input
+from keras.models import Model, Sequential
+from keras.layers import Dense, Input, LSTM
 from keras.optimizers import Adam
 
 logging.basicConfig(format='%(asctime)s - %(levelname)s - %(message)s')
@@ -17,7 +17,8 @@ logger.setLevel(logging.ERROR)
 
 
 class DQN:
-    def __init__(self, env, cfg='../cfg/dqn_setup.json'):
+    def __init__(self, env, cfg='../cfg/dqn_setup.json', arch_type='MLP'):
+        self.arch_type = arch_type
         self.env = env
         self.memory = deque(maxlen=2000)
         self.avg_reward = 0
@@ -43,11 +44,17 @@ class DQN:
         self.warmup_step = float(data['warmup_step']) if float(data['warmup_step']) else 100
         self.save_model = ''
 
-        self.model = self._build_model()
-        self.target_model = self._build_model()
+        if self.arch_type == 'LSTM':
+            logger.info('Defined Arch Type:{}'.format(self.arch_type))
+            self.model = self._build_lstm_model()
+            self.target_model = self._build_lstm_model()
+        else:
+            logger.info('Arch Type:{}'.format(self.arch_type))
+            self.model = self._build_model()
+            self.target_model = self._build_model()
 
         # Save information
-        train_file_name = "dqn_huber_clipnorm=1_clipvalue05_online_accelerator_lr%s_v4.log" % str(self.learning_rate)
+        train_file_name = 'dqn_{}_lr{}.log'.format(self.arch_type, self.learning_rate)
         self.train_file = open(train_file_name, 'w')
         self.train_writer = csv.writer(self.train_file, delimiter=" ")
 
@@ -60,6 +67,17 @@ class DQN:
         # Output: value mapped to action
         output = Dense(self.env.action_space.n, activation='linear')(h3)
         model = Model(inputs=state_input, outputs=output)
+        adam = Adam(lr=self.learning_rate, clipnorm=1.0, clipvalue=0.5)
+        model.compile(loss=tf.keras.losses.Huber(), optimizer=adam)
+        model.summary()
+        return model
+
+    def _build_lstm_model(self):
+        model = Sequential()
+        model.add(LSTM(128, return_sequences=True, input_shape=(1, self.env.observation_space.shape[0])))
+        model.add(LSTM(128, return_sequences=True))
+        model.add(LSTM(128))
+        model.add(Dense(self.env.action_space.n, ))
         adam = Adam(lr=self.learning_rate, clipnorm=1.0, clipvalue=0.5)
         model.compile(loss=tf.keras.losses.Huber(), optimizer=adam)
         model.summary()
@@ -80,6 +98,8 @@ class DQN:
         else:
             logger.info('NN action')
             np_state = np.array(state).reshape(1, len(state))
+            if self.arch_type == 'LSTM':
+                np_state = np.array(state).reshape(1, 1, len(state))
             logger.info('NN action shape{}'.format(np_state.shape))
             act_values = self.target_model.predict(np_state)
             action = np.argmax(act_values[0])
@@ -89,6 +109,8 @@ class DQN:
 
     def play(self, state):
         np_state = np.array(state).reshape(1, len(state))
+        if self.arch_type == 'LSTM':
+            np_state = np.array(state).reshape(1, 1, len(state))
         act_values = self.target_model.predict(np_state)
         return np.argmax(act_values[0])
 
@@ -104,14 +126,17 @@ class DQN:
         for state, action, reward, next_state, done in minibatch:
             np_state = np.array(state).reshape(1, len(state))
             np_next_state = np.array(next_state).reshape(1, len(next_state))
-            expectedQ = 0
+            if self.arch_type == 'LSTM':
+                np_state = np.array(state).reshape(1, 1, len(state))
+                np_next_state = np.array(next_state).reshape(1, 1, len(next_state))
+            expected_q = 0
             if not done:
-                expectedQ = self.gamma * np.amax(self.target_model.predict(np_next_state)[0])
-            target = reward + expectedQ
+                expected_q = self.gamma * np.amax(self.target_model.predict(np_next_state)[0])
+            target = reward + expected_q
             target_f = self.target_model.predict(np_state)
             target_f[0][action] = target
 
-            if batch_states==[]:
+            if batch_states == []:
                 batch_states = np_state
                 batch_target = target_f
             else:

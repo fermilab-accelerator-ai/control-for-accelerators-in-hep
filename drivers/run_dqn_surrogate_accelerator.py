@@ -65,19 +65,20 @@ if __name__ == "__main__":
     logger.info('Action_size: %s' % env.action_space)
 
     # Setup agent
-    agent = DQN(env, cfg='../cfg/dqn_setup.json')
+    agent = DQN(env, cfg='../cfg/dqn_setup.json', arch_type='MLP')
     if doPlay:
         agent.load(
             '../policy_models/results_dqn_09132020_v2/best_episodes'
             '/policy_model_e143_fnal_surrogate_dqn_mlp_episodes250_steps100_09132020.weights.h5')
     # Save information
-    save_directory = './results_dqn128_gamma85_250warmup_train5_surrogate{}_in5_out3_{}_v1/'.format(env_version,
+    save_directory = './results_dqn128_gamma85_250warmup_train5_surrogate{}_reward2_in5_out3_{}_v1/'.format(env_version,
                                                                                                     timestamp)
     if doPlay:
         save_directory = './play_results_dqn_surrogate{}_{}_v1/'.format(env_version, timestamp)
     # Make directory for information
     if not os.path.exists(save_directory):
         os.mkdir(save_directory)
+    logger.info('Save directory:{}'.format(save_directory))
     env.save_dir = save_directory
     safe_file_prefix = 'fnal_surrogate_dqn_mlp_episodes{}_steps{}_{}'.format(EPISODES, NSTEPS, timestamp)
     train_file_s = open(save_directory + safe_file_prefix + '_batched_memories.log', 'w')
