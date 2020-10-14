@@ -89,7 +89,7 @@ class DQN:
     def action(self, state):
         action = 0
         policy_type = 0
-        if np.random.rand() <= self.epsilon:
+        if (np.random.rand() <= self.epsilon) or (len(self.memory) <= self.warmup_step):
             logger.info('Random action')
             action = random.randrange(self.env.action_space.n)
             # Update randomness

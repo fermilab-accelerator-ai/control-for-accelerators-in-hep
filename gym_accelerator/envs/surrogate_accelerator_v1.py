@@ -182,9 +182,8 @@ class Surrogate_Accelerator_v1(gym.Env):
         self.data_state = None
         self.data_state = np.copy(self.X_train[self.batch_id + self.steps].reshape(1, self.nvariables, self.nsamples))
         data_iminer = self.scalers[1].inverse_transform(self.data_state[0][1][self.nsamples - 1].reshape(1, -1))
-        data_reward1 = -abs(data_iminer)
-        data_reward2 = np.exp(-2*np.abs(data_iminer))
-        data_reward = data_reward2
+        data_reward = -abs(data_iminer)
+        #data_reward = np.exp(-2*np.abs(data_iminer))
 
         # Use data for everything but the B:IMINER prediction
         self.state[0, 2:self.nvariables, :] = self.data_state[0, 2:self.nvariables, :]
@@ -195,9 +194,8 @@ class Surrogate_Accelerator_v1(gym.Env):
         logger.debug('iminer:{}'.format(iminer))
 
         # Reward
-        # reward1 = -abs(iminer)
-        reward2 = np.exp(-2*np.abs(iminer))
-        reward = reward2
+        reward = -abs(iminer)
+        #reward2 = np.exp(-2*np.abs(iminer))
 
         if abs(iminer) >= 2:
             logger.info('iminer:{} is out of bounds'.format(iminer))
@@ -212,7 +210,6 @@ class Surrogate_Accelerator_v1(gym.Env):
             done = True
 
         self.diff += np.asscalar(abs(data_iminer - iminer))
-
         self.data_total_reward += np.asscalar(data_reward)
         self.total_reward += np.asscalar(reward)
 
