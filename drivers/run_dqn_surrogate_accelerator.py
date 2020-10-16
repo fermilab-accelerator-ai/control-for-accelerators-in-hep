@@ -13,8 +13,7 @@ from datetime import datetime
 
 # Framework class
 from agents.dqn import DQN
-
-# from agents.dqn_ensemble_v1 import DQN
+from agents.dqn_ensemble_v1 import DQN as DQN_Ensemble
 
 # Seed value
 # Apparently you may use different seed values at each stage
@@ -46,7 +45,7 @@ if __name__ == "__main__":
     doPlay = False
 
     # Train
-    EPISODES = 500
+    EPISODES = 2000
     NSTEPS: int = 50
     best_reward = -100000
     if doPlay:
@@ -66,14 +65,22 @@ if __name__ == "__main__":
 
     # Setup agent
     arch_type = 'LSTM'
-    agent = DQN(env, cfg='../cfg/dqn_setup.json', arch_type=arch_type)
+    nmodels = 5
+    if nmodels > 1:
+        arch_type = 'MLP_Ensemble'
+        logger.info('Using DQN {}({})'.format(arch_type, nmodels))
+        agent = DQN_Ensemble(env, cfg='../cfg/dqn_setup.json', nmodels=nmodels)
+    else:
+        logger.info('Using DQN {}'.format(arch_type))
+        agent = DQN(env, cfg='../cfg/dqn_setup.json', arch_type=arch_type)
+
     if doPlay:
         agent.load(
             '../policy_models/results_dqn_09132020_v2/best_episodes'
             '/policy_model_e143_fnal_surrogate_dqn_mlp_episodes250_steps100_09132020.weights.h5')
     # Save information
-    save_directory = './results_dqn_{}128_gamma85_250warmup_train5_surrogate{}_reward1_in5_out3_{}_v1/'.format(
-        arch_type, env_version, timestamp)
+    save_directory = './results_dqn_{}_{}_n128_gamma85_250warmup_train5_surrogate{}_in5_out3_{}_v1/'.format(
+        arch_type, nmodels, env_version, timestamp)
     if doPlay:
         save_directory = './play_results_dqn_surrogate{}_{}_v1/'.format(env_version, timestamp)
     # Make directory for information
