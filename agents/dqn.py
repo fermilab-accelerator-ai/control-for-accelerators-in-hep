@@ -7,9 +7,9 @@ import numpy as np
 import tensorflow as tf
 
 from collections import deque
-from keras.models import Model, Sequential
-from keras.layers import Dense, Input, LSTM
-from keras.optimizers import Adam
+from tensorflow.keras.models import Model, Sequential
+from tensorflow.keras.layers import Dense, Input, LSTM
+from tensorflow.keras.optimizers import Adam
 
 logging.basicConfig(format='%(asctime)s - %(levelname)s - %(message)s')
 logger = logging.getLogger('RL-Logger')
@@ -17,7 +17,7 @@ logger.setLevel(logging.ERROR)
 
 
 class DQN:
-    def __init__(self, env, cfg='../cfg/dqn_setup.json', arch_type='MLP'):
+    def __init__(self, env, cfg='../cfg/dqn_setup.json', arch_type='MLP', nmodels=0):
         self.arch_type = arch_type
         self.env = env
         self.memory = deque(maxlen=2000)
@@ -48,8 +48,12 @@ class DQN:
             logger.info('Defined Arch Type:{}'.format(self.arch_type))
             self.model = self._build_lstm_model()
             self.target_model = self._build_lstm_model()
+        elif self.arch_type == 'MLP_Ensemble':
+            logger.info('Defined Arch Type:{}'.format(self.arch_type))
+            self.model = self._build_ensemble(nmodels)
+            self.target_model = self._build_ensemble(nmodels)
         else:
-            logger.info('Arch Type:{}'.format(self.arch_type))
+            logger.info('Using Default Arch Type:{}'.format(self.arch_type))
             self.model = self._build_model()
             self.target_model = self._build_model()
 
@@ -78,6 +82,26 @@ class DQN:
         model.add(LSTM(128, return_sequences=True))
         model.add(LSTM(128))
         model.add(Dense(self.env.action_space.n, ))
+        adam = Adam(lr=self.learning_rate, clipnorm=1.0, clipvalue=0.5)
+        model.compile(loss=tf.keras.losses.Huber(), optimizer=adam)
+        model.summary()
+        return model
+
+    def _build_ensemble(self, nmodel=5):
+        # Define input
+        state_input = Input(self.env.observation_space.shape)
+        outputs = []
+        for _ in range(nmodel):
+            # Input: state
+            h1 = Dense(128, activation='relu')(state_input)
+            h2 = Dense(128, activation='relu')(h1)
+            h3 = Dense(128, activation='relu')(h2)
+            # Output: value mapped to action
+            output = Dense(self.env.action_space.n, activation='linear')(h3)
+            outputs.append(output)
+
+        out_avg = tf.keras.layers.Average()(outputs)
+        model = tf.keras.models.Model(inputs=[state_input], outputs=out_avg)
         adam = Adam(lr=self.learning_rate, clipnorm=1.0, clipvalue=0.5)
         model.compile(loss=tf.keras.losses.Huber(), optimizer=adam)
         model.summary()

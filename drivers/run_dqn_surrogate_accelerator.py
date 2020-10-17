@@ -11,9 +11,11 @@ import tensorflow as tf
 from tqdm import tqdm
 from datetime import datetime
 
+# Try plaidml
+#os.environ["KERAS_BACKEND"] = "tensorflow.keras.backend"
+
 # Framework class
 from agents.dqn import DQN
-from agents.dqn_ensemble_v1 import DQN as DQN_Ensemble
 
 # Seed value
 # Apparently you may use different seed values at each stage
@@ -52,7 +54,6 @@ if __name__ == "__main__":
         EPISODES = 1
     # Setup environment
     estart = time.time()
-    # env = gym.make('gym_accelerator:Surrogate_Accelerator-v0')
     env_version = 1
     env = gym.make('gym_accelerator:Surrogate_Accelerator-v{}'.format(env_version))
     env._max_episode_steps = NSTEPS
@@ -64,15 +65,10 @@ if __name__ == "__main__":
     logger.info('Action_size: %s' % env.action_space)
 
     # Setup agent
-    arch_type = 'LSTM'
+    arch_type = 'MLP_Ensemble'
     nmodels = 5
-    if nmodels > 1:
-        arch_type = 'MLP_Ensemble'
-        logger.info('Using DQN {}({})'.format(arch_type, nmodels))
-        agent = DQN_Ensemble(env, cfg='../cfg/dqn_setup.json', nmodels=nmodels)
-    else:
-        logger.info('Using DQN {}'.format(arch_type))
-        agent = DQN(env, cfg='../cfg/dqn_setup.json', arch_type=arch_type)
+    logger.info('Using DQN {}'.format(arch_type))
+    agent = DQN(env, cfg='../cfg/dqn_setup.json', arch_type=arch_type, nmodels=nmodels)
 
     if doPlay:
         agent.load(
