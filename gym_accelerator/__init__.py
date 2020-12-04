@@ -29,3 +29,8 @@ register(
     id='Surrogate_Accelerator-v3',
     entry_point='gym_accelerator.envs:Surrogate_Accelerator_v3',
 )
+
+register(
+    id='Surrogate_Accelerator-v4',
+    entry_point='gym_accelerator.envs:Surrogate_Accelerator_v4',
+)
