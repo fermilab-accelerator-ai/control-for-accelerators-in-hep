@@ -5,16 +5,16 @@ from gym.utils import seeding
 import pandas as pd
 
 # Framework class
-import os
-import sys
-cwd = os.getcwd()
-new = 'C:/Users/dkafkes/Desktop/fermi/accelerator-reinforcement-learning/control-for-accelerators-in-hep/dataprep'
+# import os
+# import sys
+# cwd = os.getcwd()
+# new = 'C:/Users/dkafkes/Desktop/fermi/accelerator-reinforcement-learning/control-for-accelerators-in-hep/dataprep'
 
-sys.path.append(new)
-os.chdir(sys.path[-1])
-print(os.getcwd())
+# sys.path.append(new)
+# os.chdir(sys.path[-1])
+# print(os.getcwd())
 import dataset as dp
-os.chdir(cwd)
+# os.chdir(cwd)
 
 from tensorflow import keras
 from sklearn.preprocessing import MinMaxScaler
@@ -62,25 +62,6 @@ def get_dataset(df, variable='B:VIMIN'):
 
     return scaler, X_train, Y_train #, X_test, Y_test
 
-# def data_distribution_plot(model, BoX_test, BoY_test, episode, step):
-#   fig, axs = plt.subplots(1, figsize=(12,12))
-#   x_test=BoX_test
-#   y_test=BoY_test
-#   start=0
-#   end=BoX_test.shape[0]
-#   Y_predict = model.predict(x_test[start:end,:,:])
-#   Y_test_var0 = data_list[0][0].inverse_transform(y_test[start:end,0].reshape(-1,1)).reshape(-1,1)
-#   Y_test_var1 = data_list[1][0].inverse_transform(y_test[start:end,1].reshape(-1,1)).reshape(-1,1)
-#   Y_predict_var0 = data_list[0][0].inverse_transform(Y_predict[:,0].reshape(-1,1)).reshape(-1,1)
-#   Y_predict_var1 = data_list[1][0].inverse_transform(Y_predict[:,1].reshape(-1,1)).reshape(-1,1)
-#   np_predict = np.concatenate((Y_test_var0,Y_test_var1,Y_predict_var0,Y_predict_var1),axis=concate_axis) 
-#   df_cool = pd.DataFrame(np_predict,columns=['data_va0','data_va1','pred_va0','pred_va1'])
-
-#   sns.scatterplot(data=df_cool, x="data_va0", y="data_va1", label='Data')#, hue="time")
-#   sns.scatterplot(data=df_cool, x="pred_va0", y="pred_va1", label='Digital Twin')#, hue="time")
-#   #sns.scatterplot(data=df_cool, x="data_va1", y="pred_va1", label='Data')#, hue="time")
-#   plt.savefig(os.path.join(directory), 'episode{}_step{}_corr_final.png'.format(episode, step))
-
 class Surrogate_Accelerator_v4(gym.Env):
     def __init__(self):
 
@@ -103,7 +84,7 @@ class Surrogate_Accelerator_v4(gym.Env):
         # Load surrogate models
         #https://github.com/keras-team/keras/issues/14040 needs it to be false
         self.booster_model = keras.models.load_model(
-            '../surrogate_models/databricks models/2to2_1sec/fullbooster_noshift_e250_bs99_k_invar2_outvar2_axis1_mmscaler_t0_D11202020-T175745_kfold4__final.h5', compile = False)
+            '../surrogate_models/databricks models/5to2_1sec_decomposed/fullbooster_noshift_e250_bs99_k_invar13_outvar2_axis1_mmscaler_t0_D12162020-T172340_kfold4__final.h5', compile = False)
 
             #fullbooster_noshift_e250_bs99_nsteps250k_invar5_outvar3_axis1_mmscaler_t0_D10122020'
             #'-T175237_kfold2__e16_vl0.00038.h5')
@@ -115,13 +96,14 @@ class Surrogate_Accelerator_v4(gym.Env):
         # Load scalers
 
         # Load data to initialize the env
-        filename = '310_11_more_params.csv'
+        filename = 'decomposed_all.csv'
         data = dp.load_reformated_cvs('../data/' + filename, nrows=250000)
         data['B:VIMIN'] = data['B:VIMIN'].shift(-1)
         data = data.set_index(pd.to_datetime(data.time))
         data = data.dropna()
         data = data.drop_duplicates()
-        self.variables = ['B:VIMIN', 'B:IMINER'] #'B:LINFRQ', 'I:IB', 'I:MDAT40']
+        self.variables = ['B:VIMIN', 'B:IMINER', 'B_VIMIN', 'B:VIMIN_1', 'B:VIMIN_2', 'B:IMINER_1', 'B:IMINER_2', 'B:LINFRQ_1', 'B:LINFRQ_2', 'I:IB_1', 'I:IB_2', 'I:MDAT40_1', 'I:MDAT40_2']
+        #['B:VIMIN', 'B:IMINER'] #'B:LINFRQ', 'I:IB', 'I:MDAT40']
         # self.variables = ['B:VIMIN', 'B:IMINER', 'B:VIPHAS', 'B:LINFRQ', 'I:IB', 'I:MDAT40', 'I:MXIB']
         self.nvariables = len(self.variables)
         logger.info('Number of variables:{}'.format(self.nvariables))
