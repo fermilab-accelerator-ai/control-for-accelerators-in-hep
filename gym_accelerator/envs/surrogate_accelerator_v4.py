@@ -13,7 +13,7 @@ import pandas as pd
 # sys.path.append(new)
 # os.chdir(sys.path[-1])
 # print(os.getcwd())
-import dataset as dp
+# import dataset as dp
 # os.chdir(cwd)
 
 from tensorflow import keras
@@ -62,7 +62,47 @@ def get_dataset(df, variable='B:VIMIN'):
 
     return scaler, X_train, Y_train #, X_test, Y_test
 
-class Surrogate_Accelerator_v4(gym.Env):
+# def data_distribution_plot(model, BoX_test, BoY_test, episode, step):
+#   fig, axs = plt.subplots(1, figsize=(12,12))
+#   x_test=BoX_test
+#   y_test=BoY_test
+#   start=0
+#   end=BoX_test.shape[0]
+#   Y_predict = model.predict(x_test[start:end,:,:])
+#   Y_test_var0 = data_list[0][0].inverse_transform(y_test[start:end,0].reshape(-1,1)).reshape(-1,1)
+#   Y_test_var1 = data_list[1][0].inverse_transform(y_test[start:end,1].reshape(-1,1)).reshape(-1,1)
+#   Y_predict_var0 = data_list[0][0].inverse_transform(Y_predict[:,0].reshape(-1,1)).reshape(-1,1)
+#   Y_predict_var1 = data_list[1][0].inverse_transform(Y_predict[:,1].reshape(-1,1)).reshape(-1,1)
+#   np_predict = np.concatenate((Y_test_var0,Y_test_var1,Y_predict_var0,Y_predict_var1),axis=concate_axis) 
+#   df_cool = pd.DataFrame(np_predict,columns=['data_va0','data_va1','pred_va0','pred_va1'])
+
+#   sns.scatterplot(data=df_cool, x="data_va0", y="data_va1", label='Data')#, hue="time")
+#   sns.scatterplot(data=df_cool, x="pred_va0", y="pred_va1", label='Digital Twin')#, hue="time")
+#   #sns.scatterplot(data=df_cool, x="data_va1", y="pred_va1", label='Data')#, hue="time")
+#   plt.savefig(os.path.join(directory), 'episode{}_step{}_corr_final.png'.format(episode, step))
+
+def regulation(alpha, gamma, error, min_set, beta):
+  ## calculate the prediction with current regulation rules
+  ## from Rachael's report, eq (1)
+  #beta=[0]
+  ER = error #error
+  _MIN = min_set #setting
+  for i in range(len(_MIN)):
+      if i>0:
+            beta_t = beta[-1] + gamma*ER[i]
+            beta.append(beta_t) #hopefully this will update self.rachael_beta in place
+  # print()
+  # print("Rachael's Eq")
+  # print(_MIN.shape)
+  # print(alpha)
+  # print(ER.shape)
+  # print(np.asarray(beta).reshape(15,1).shape)
+  # print()
+
+  MIN_pred = _MIN - alpha * ER - np.asarray(beta[-15:]).reshape(15,1) #predict the next, shiftting happens in the plotting
+  return MIN_pred
+
+class Surrogate_Accelerator_v1(gym.Env):
     def __init__(self):
 
         self.save_dir = os.getcwd() #'./'
@@ -72,6 +112,9 @@ class Surrogate_Accelerator_v4(gym.Env):
         self.total_reward = 0
         self.data_total_reward = 0
         self.diff = 0
+
+        self.rachael_reward = 0
+        self.rachael_beta = [0] #unclear if needed... depends on whether the regulation should be allowed to build continuously
 
         # Define boundary
         self.min_BIMIN = 103.1
@@ -83,8 +126,9 @@ class Surrogate_Accelerator_v4(gym.Env):
 
         # Load surrogate models
         #https://github.com/keras-team/keras/issues/14040 needs it to be false
-        self.booster_model = keras.models.load_model(
-            '../surrogate_models/databricks models/5to2_1sec_decomposed/fullbooster_noshift_e250_bs99_k_invar13_outvar2_axis1_mmscaler_t0_D12162020-T172340_kfold4__final.h5', compile = False)
+        #print(os.getcwd())
+        self.booster_model = keras.models.load_model('C:/Users/dkafkes/Desktop/fermi/accelerator-reinforcement-learning/control-for-accelerators-in-hep/surrogate_models/databricks models/5to2_1sec_decomposed/fullbooster_noshift_e250_bs99_k_invar13_outvar2_axis1_mmscaler_t0_D12162020-T172340_kfold4__final.h5', compile = False)
+            #'../surrogate_models/databricks models/2to2_1sec_decomposed/fullbooster_noshift_e250_bs99_k_invar6_outvar2_axis1_mmscaler_t0_D12042020-T181345_kfold4__final.h5', compile = False)
 
             #fullbooster_noshift_e250_bs99_nsteps250k_invar5_outvar3_axis1_mmscaler_t0_D10122020'
             #'-T175237_kfold2__e16_vl0.00038.h5')
@@ -96,15 +140,19 @@ class Surrogate_Accelerator_v4(gym.Env):
         # Load scalers
 
         # Load data to initialize the env
-        filename = 'decomposed_all.csv'
+        filename = 'decomposed_all.csv' #'310_11_more_params.csv'
         data = dp.load_reformated_cvs('../data/' + filename, nrows=250000)
         data['B:VIMIN'] = data['B:VIMIN'].shift(-1)
+        #B:VIMIN shifted back one... should B_VIMIN be shifted? should B:VIMIN_1 and B:VIMIN_2 be shifted?
+        data['B:VIMIN_1'] = data['B:VIMIN_1'].shift(-1) #yes
+        data['B:VIMIN_2'] = data['B:VIMIN_2'].shift(-1) #yes
+
         data = data.set_index(pd.to_datetime(data.time))
         data = data.dropna()
         data = data.drop_duplicates()
         self.variables = ['B:VIMIN', 'B:IMINER', 'B_VIMIN', 'B:VIMIN_1', 'B:VIMIN_2', 'B:IMINER_1', 'B:IMINER_2', 'B:LINFRQ_1', 'B:LINFRQ_2', 'I:IB_1', 'I:IB_2', 'I:MDAT40_1', 'I:MDAT40_2']
-        #['B:VIMIN', 'B:IMINER'] #'B:LINFRQ', 'I:IB', 'I:MDAT40']
-        # self.variables = ['B:VIMIN', 'B:IMINER', 'B:VIPHAS', 'B:LINFRQ', 'I:IB', 'I:MDAT40', 'I:MXIB']
+        #['B:VIMIN', 'B:IMINER', 'B_VIMIN', 'B:VIMIN_1', 'B:VIMIN_2', 'B:IMINER_1', 'B:IMINER_2'] #'B:VIMIN_1', 'B:VIMIN_2', 'B:IMINER_1', 'B:VIMIN_2'] #['B:VIMIN', 'B:IMINER'] #TODO: change variables here 'B:LINFRQ', 'I:IB', 'I:MDAT40']
+        # self.variables = ['B: #VIMIN', 'B:IMINER', 'B:VIPHAS', 'B:LINFRQ', 'I:IB', 'I:MDAT40', 'I:MXIB']
         self.nvariables = len(self.variables)
         logger.info('Number of variables:{}'.format(self.nvariables))
 
@@ -138,8 +186,13 @@ class Surrogate_Accelerator_v4(gym.Env):
         self.action_space = spaces.Discrete(7)
         self.VIMIN = 0
         ##
+
         self.state = np.zeros(shape=(1, self.nvariables, self.nsamples))
         self.predicted_state = np.zeros(shape=(1, self.nvariables, 1))
+
+        self.rachael_state = np.zeros(shape=(1, self.nvariables, self.nsamples))
+        self.rachael_predicted_state = np.zeros(shape=(1, self.nvariables, 1))
+
         logger.debug('Init pred shape:{}'.format(self.predicted_state.shape))
 
     def seed(self, seed=None):
@@ -163,9 +216,27 @@ class Surrogate_Accelerator_v4(gym.Env):
         DENORN_BVIMIN = self.scalers[0].inverse_transform(np.array([self.VIMIN]).reshape(1, -1))
         DENORN_BVIMIN += delta_VIMIN
         logger.debug('Step() descaled VIMIN:{}'.format(DENORN_BVIMIN))
+
+        #Rachael's Eq as an action
+        alpha = 10e-2
+        gamma = 7.535e-5
+
+        B_VIMIN_trace = self.scalers[2].inverse_transform(self.state[0, 2, :].reshape(-1, 1))
+        BIMINER_trace = self.scalers[1].inverse_transform(self.state[0, 1, :].reshape(-1, 1))
+        
+        #need data to be plugged in to get predicted state from rachael's equation
+        self.rachael_state[0][0][self.nsamples - 1] = regulation(alpha, gamma, error = BIMINER_trace, min_set = B_VIMIN_trace, beta = self.rachael_beta)[-1] #grab last value
+        #print(self.rachael_beta) # i just verified it updates in place
+
+        #add guardrails
         if DENORN_BVIMIN < self.min_BIMIN or DENORN_BVIMIN > self.max_BIMIN:
             logger.info('Step() descaled VIMIN:{} is out of bounds.'.format(DENORN_BVIMIN))
             done = True
+
+        #TODO: change to Rachael's equation prediction...
+        # if np.abs(DENORN_BIVIMIN - self.rachael_state[0][0][self.nsamples - 1]) >= some constant:
+        #     logger.info('Step() descaled VIMIN:{} is out of bounds.'.format(DENORN_BVIMIN))
+        #     done = True
 
         self.VIMIN = self.scalers[0].transform(DENORN_BVIMIN)
         logger.debug('Step() updated VIMIN:{}'.format(self.VIMIN))
@@ -175,6 +246,10 @@ class Surrogate_Accelerator_v4(gym.Env):
         self.predicted_state = self.booster_model.predict(self.state)
         #print(self.predicted_state)
         self.predicted_state = self.predicted_state.reshape(1, 2, 1) #used to be 3 in the center #TODO: make dynamic
+
+        #Rachael's equation
+        self.rachael_predicted_state = self.booster_model.predict(self.rachael_state)
+        self.rachael_predicted_state = self.rachael_predicted_state.reshape(1, 2, 1)
 
         # Step 3: Update IMINER and LINFQN
         # print(self.state.shape)
@@ -193,10 +268,12 @@ class Surrogate_Accelerator_v4(gym.Env):
         # logger.debug('Step() state with updated injector state model\n{}'.format(self.state[0,:,-2:]))
         #
         # Step 4: Shift state by one step
-        self.state[0, :, 0:-1] = self.state[0, :, 1:]
+        self.state[0, :, 0:-1] = self.state[0, :, 1:] #shift forward
+        self.rachael_state[0, :, 0:-1] = self.rachael_state[0, :, 1:]
 
         # Update IMINER
         self.state[0][1][self.nsamples - 1] = self.predicted_state[0, 1:2]
+        self.rachael_state[0][1][self.nsamples - 1] = self.rachael_predicted_state[0, 1:2]
         # ## Update injector variables
         # self.state[0, 3:5, -1:] = injector_prediction[0,:]
 
@@ -204,12 +281,14 @@ class Surrogate_Accelerator_v4(gym.Env):
         self.data_state = None
         self.data_state = np.copy(self.X_train[self.batch_id + self.steps].reshape(1, self.nvariables, self.nsamples))
         data_iminer = self.scalers[1].inverse_transform(self.data_state[0][1][self.nsamples - 1].reshape(1, -1))
+
         #where's data_vimin
         data_reward = -abs(data_iminer)
         #data_reward = np.exp(-2*np.abs(data_iminer))
 
         # Use data for everything but the B:IMINER prediction
         self.state[0, 2:self.nvariables, :] = self.data_state[0, 2:self.nvariables, :]
+        self.rachael_state[0, 2:self.nvariables, :] = self.data_state[0, 2:self.nvariables, :]
 
         iminer = self.predicted_state[0, 1]
         logger.debug('norm iminer:{}'.format(iminer))
@@ -219,6 +298,10 @@ class Surrogate_Accelerator_v4(gym.Env):
         # Reward
         reward = -abs(iminer)
         #reward2 = np.exp(-2*np.abs(iminer))
+
+        #update rachael state for rendering
+        rach_reward = -abs(self.scalers[1].inverse_transform(np.array([self.rachael_predicted_state[0, 1]]).reshape(1, -1)))
+        #print(self.rachael_reward)
 
         if abs(iminer) >= 2:
             logger.info('iminer:{} is out of bounds'.format(iminer))
@@ -235,6 +318,11 @@ class Surrogate_Accelerator_v4(gym.Env):
         self.diff += np.asscalar(abs(data_iminer - iminer))
         self.data_total_reward += np.asscalar(data_reward)
         self.total_reward += np.asscalar(reward)
+        self.rachael_reward += np.asscalar(rach_reward)
+
+        # print(self.total_reward)
+        # print(self.data_total_reward)
+        # print(self.rachael_reward)
 
         self.render()
 
@@ -247,6 +335,8 @@ class Surrogate_Accelerator_v4(gym.Env):
         self.total_reward = 0
         self.diff = 0
         self.data_state = None
+        self.rachael_reward = 0
+        self.rachael_beta = [0]
 
         # Prepare the random sample ##
         self.batch_id = 10
@@ -256,6 +346,10 @@ class Surrogate_Accelerator_v4(gym.Env):
         logger.debug('self.state:{}'.format(self.state))
         self.state = None
         self.state = np.copy(self.X_train[self.batch_id].reshape(1, self.nvariables, self.nsamples))
+        
+        self.rachael_state = None
+        self.rachael_state = np.copy(self.X_train[self.batch_id].reshape(1, self.nvariables, self.nsamples))
+
         logger.debug('self.state:{}'.format(self.state))
         logger.debug('reset_data.shape:{}'.format(self.state.shape))
         self.VIMIN = self.state[0, 0, -1:]
@@ -295,27 +389,77 @@ class Surrogate_Accelerator_v4(gym.Env):
 
         import seaborn as sns
         sns.set_style("ticks")
-        nvars = 2  # len(self.variables)
+        nvars = 2  # len(self.variables)> we just want B:VIMIN and B:IMINER
         fig, axs = plt.subplots(nvars, figsize=(12, 8))
         logger.debug('self.state:{}'.format(self.state))
+
+        #Rachael's Eq
+        alpha = 10e-2
+        gamma = 7.535e-5
+        #try dstate
+        BVIMIN_trace = self.scalers[0].inverse_transform(self.state[0, 0, 1:-1].reshape(-1, 1))
+
+        # print(type(BVIMIN_trace))
+        # print(BVIMIN_trace.shape)
+
+        BIMINER_trace = self.scalers[1].inverse_transform(self.state[0, 1, :].reshape(-1, 1))
+
+        # print(type(BIMINER_trace))
+        # print(BIMINER_trace.shape)
+
+        B_VIMIN_trace = self.scalers[2].inverse_transform(self.state[0, 2, :].reshape(-1, 1)) #will this work or does it have to stay as something we grab from data
+
+        # print(type(B_VIMIN_trace))
+        # print(B_VIMIN_trace.shape)
+
+        BVIMIN_pred = regulation(alpha, gamma, error = BIMINER_trace, min_set = B_VIMIN_trace, beta = [0])
+
+        # print(type(BVIMIN_pred))
+        # print(BVIMIN_pred.shape)
+
+        #BVIMIN_pred = regulation(alpha, gamma, error = BIMINER_trace*0, min_set = B_VIMIN_trace)
+        _IMINER = 10*np.add(B_VIMIN_trace, -1*BVIMIN_pred)  #don't need to shift since BVIMIN started shifted
+
+        rachael_IMINER = self.scalers[1].inverse_transform(self.rachael_state[0, 1, :].reshape(-1, 1))
+
+        #print(_IMINER)
+        #print(BIMINER_trace)
+
+        #sys.exit()
+        # print(type(_IMINER))
+        # print(_IMINER.shape)
+
+        #self.rachael_reward += -1*np.asscalar(_IMINER[-1][0])
+        
         for v in range(0, nvars):
             utrace = self.state[0, v, :]
             trace = self.scalers[v].inverse_transform(utrace.reshape(-1, 1))
+
             if v == 0:
-                axs[v].set_title('Raw data reward: {:.2f} - RL agent reward: {:.2f} '.format(self.data_total_reward,
-                                                                                             self.total_reward))
-            axs[v].plot(trace, label='Digital twin', color='black')
+                axs[v].set_title('Raw data reward: {:.2f} - RL agent reward: {:.2f} - Rachael Eq reward {:.2f}'.format(self.data_total_reward, self.total_reward, self.rachael_reward)) #soemthing seems weird... might need to actually track it above
+            
+            axs[v].plot(trace, label='Digital Twin', color='black')
 
             # if v==1:
             data_utrace = self.data_state[0, v, :]
             data_trace = self.scalers[v].inverse_transform(data_utrace.reshape(-1, 1))
+
+            #you'll need to transform two
+
             if v == 1:
                 x = np.linspace(0, 14, 15) #np.linspace(0, 149, 150) #TODO: change this so that it is dynamic for lookback
                 axs[v].fill_between(x, -data_trace.flatten(), +data_trace.flatten(), alpha=0.2, color='red')
+
             axs[v].plot(data_trace, 'r--', label='Data')
+            #axs[v].plot()
             axs[v].set_xlabel('time')
             axs[v].set_ylabel('{}'.format(self.variables[v]))
-            axs[v].legend(loc='upper left')
+            #axs[v].legend(loc='upper left')
+
+        axs[0].plot(np.linspace(-1,13,15), BVIMIN_pred, label="Rachael's Eq", color = 'blue', linestyle = 'dotted')
+        axs[0].legend(loc='upper left')
+        axs[1].plot(np.linspace(0,14,15), rachael_IMINER, label="Rachael's Eq Action", color = 'blue', linestyle = 'dotted')
+        axs[1].legend(loc='upper left')
 
         plt.savefig('episode{}_step{}_v1.png'.format(self.episodes, self.steps))
         plt.clf()
@@ -333,11 +477,14 @@ class Surrogate_Accelerator_v4(gym.Env):
         Y_data_bvimin = self.scalers[0].inverse_transform(self.data_state[0][0].reshape(-1,1)).reshape(-1,1) #[start:end,0]
         Y_data_biminer = self.scalers[1].inverse_transform(self.data_state[0][1].reshape(-1,1)).reshape(-1,1) #[start:end,1]
 
-        np_predict = np.concatenate((Y_data_bvimin, Y_data_biminer, Y_agent_bvimin, Y_agent_biminer),axis=self.concate_axis) 
-        df_cool = pd.DataFrame(np_predict, columns=['bvimin_data','biminer_data', 'bvimin_agent', 'biminer_agent'])
+        Y_rachael_bvimin = self.scalers[0].inverse_transform(self.rachael_state[0][0].reshape(-1,1)).reshape(-1,1)
+        Y_rachael_iminer = self.scalers[1].inverse_transform(self.rachael_state[0][1].reshape(-1,1)).reshape(-1,1)
+
+        np_predict = np.concatenate((Y_data_bvimin, Y_data_biminer, Y_agent_bvimin, Y_agent_biminer, Y_rachael_bvimin, Y_rachael_iminer),axis=self.concate_axis) 
+        df_cool = pd.DataFrame(np_predict, columns=['bvimin_data','biminer_data', 'bvimin_agent', 'biminer_agent', 'bvimin_rachael', 'biminer_rachael'])
         sns.scatterplot(data=df_cool, x="bvimin_data", y="biminer_data", label='Data')#, hue="time")
         sns.scatterplot(data=df_cool, x="bvimin_agent", y="biminer_agent", label='Digital Twin')#, hue="time")
-        #sns.scatterplot(data=df_cool, x="data_va1", y="pred_va1", label='Data')#, hue="time")
+        sns.scatterplot(data=df_cool, x="bvimin_rachael", y="biminer_rachael", label="Rachael's Eq")#, hue="time")
         plt.savefig('corr_episode{}_step{}.png'.format(self.episodes, self.steps))
 
         plt.close('all')
