@@ -1,0 +1,5 @@
+{
+    "data_dir" : "./data/",
+    "data_filename": "data_release.csv",
+    "data_type": "csv"
+}
