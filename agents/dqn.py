@@ -5,11 +5,11 @@ import random
 import logging
 import numpy as np
 import tensorflow as tf
-
+from globals import *
 from collections import deque
-from tensorflow.keras.models import Model, Sequential
-from tensorflow.keras.layers import Dense, Input, LSTM
-from tensorflow.keras.optimizers import Adam
+from keras.models import Model, Sequential
+from keras.layers import Dense, Input, LSTM
+from keras.optimizer_v2.adam import Adam
 
 logging.basicConfig(format='%(asctime)s - %(levelname)s - %(message)s')
 logger = logging.getLogger('RL-Logger')
@@ -17,7 +17,7 @@ logger.setLevel(logging.ERROR)
 
 
 class DQN:
-    def __init__(self, env, cfg='../cfg/dqn_setup.json', arch_type='MLP', nmodels=0):
+    def __init__( self , env , cfg= DQN_CONFIG_FILE , arch_type= 'MLP' , nmodels=0 ):
         self.arch_type = arch_type
         self.env = env
         self.memory = deque(maxlen=2000)
@@ -29,7 +29,7 @@ class DQN:
         logger.info('Agent action space:{}'.format(self.env.action_space.n))
         logger.info('Agent state space:{}'.format(self.env.observation_space.shape))
 
-        # Get hyper-parameters from json cfg file
+        # Get hyper-parameters from json config file
         data = []
         with open(cfg) as json_file:
             data = json.load(json_file)
@@ -58,7 +58,7 @@ class DQN:
             self.target_model = self._build_model()
 
         # Save information
-        train_file_name = 'dqn_{}_lr{}.log'.format(self.arch_type, self.learning_rate)
+        train_file_name = RESULTS_DIR + '/dqn_{}_lr{}.log'.format(self.arch_type, self.learning_rate)
         self.train_file = open(train_file_name, 'w')
         self.train_writer = csv.writer(self.train_file, delimiter=" ")
 
@@ -71,7 +71,9 @@ class DQN:
         # Output: value mapped to action
         output = Dense(self.env.action_space.n, activation='linear')(h3)
         model = Model(inputs=state_input, outputs=output)
-        adam = Adam(lr=self.learning_rate, clipnorm=1.0, clipvalue=0.5)
+        adam = Adam(lr=self.learning_rate,
+                    clipnorm=1.0,
+                    clipvalue=0.5)
         model.compile(loss=tf.keras.losses.Huber(), optimizer=adam)
         model.summary()
         return model
@@ -82,7 +84,9 @@ class DQN:
         model.add(LSTM(128, return_sequences=True))
         model.add(LSTM(128))
         model.add(Dense(self.env.action_space.n, ))
-        adam = Adam(lr=self.learning_rate, clipnorm=1.0, clipvalue=0.5)
+        adam = Adam(lr=self.learning_rate,
+                    clipnorm=1.0,
+                    clipvalue=0.5)
         model.compile(loss=tf.keras.losses.Huber(), optimizer=adam)
         model.summary()
         return model

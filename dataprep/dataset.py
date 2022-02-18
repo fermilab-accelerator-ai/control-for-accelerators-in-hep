@@ -1,13 +1,9 @@
-import pandas as pd
 import h5py
+import pandas as pd
 import numpy as np
-import datetime
+from globals import *
 from functools import reduce
 from sklearn.preprocessing import MinMaxScaler
-
-## TODO: Another ugly hack
-look_back=150
-look_forward=1
 
 def reformat_data(filename, data_type='h5'):
     '''
@@ -63,7 +59,8 @@ def reformat_data(filename, data_type='h5'):
 
     return status
 
-def load_reformated_cvs(filename,nrows=100000):
+def load_reformated_csv(filename,
+                        nrows=100000):
     df = pd.read_csv(filename,nrows=nrows)
     df=df.replace([np.inf, -np.inf], np.nan)
     df=df.dropna(axis=0)
@@ -74,27 +71,21 @@ def load_reformated_hdf5(filename):
     print(df.columns)
     return df
 
-def create_dataset(dataset, look_back=1, look_forward=1):
-    '''
-     Description:
-         Method use to create a single trace for LSTM model
-         This allows for easier data processing within the TF2 Dataset tools
-     :param dataset: pandas dataframe with variable
-     :param look_back: number of time step before prediction
-     :param look_forward: number of time step to prediction
-     :return: two numpy array (input,output)
-     '''
-    X, Y = [], []
+def create_dataset ( dataset ,
+                     look_back: int = 1 ,
+                     look_forward: int = 1 ) :
+    X , Y = [] , []
     offset = look_back + look_forward
-    for i in range(len(dataset) - (offset + 1)):
-        xx = dataset[i:(i + look_back), 0]
-        yy = dataset[(i + look_back):(i + offset), 0]
-        X.append(xx)
-        Y.append(yy)
-    return np.array(X), np.array(Y)
+    for i in range ( len ( dataset ) - (offset + 1) ) :
+        xx = dataset [i :(i + look_back) , 0]
+        yy = dataset [(i + look_back) :(i + offset) , 0]
+        X.append ( xx )
+        Y.append ( yy )
+    return np.array ( X ) , np.array ( Y )
 
-
-def get_dataset(dataframe, variable='B:VIMIN', split_fraction=0.8,concate_axis=1):
+def get_dataset(dataframe,
+                variable='B:VIMIN',
+                split_fraction=0.8):
     '''
      Description:
          Method that scales the data and split into train/test datasets
@@ -112,20 +103,16 @@ def get_dataset(dataframe, variable='B:VIMIN', split_fraction=0.8,concate_axis=1
     ## TODO: Fix
     #print(len(dataset))
     train_size = int(len(dataset) * split_fraction)
-    #print(train_size)
-    test_size = len(dataset) - train_size
-    #print(test_size)
-
     ## Split dataset
     train, test = dataset[0:train_size, :], dataset[train_size:len(dataset), :]
 
     ## Create train dataset
-    X_train, Y_train = create_dataset(train, look_back, look_forward)
+    X_train, Y_train = create_dataset(train, LOOK_BACK, LOOK_FORWARD)
     X_train = np.reshape(X_train, (X_train.shape[0], 1, X_train.shape[1]))
     Y_train = np.reshape(Y_train, (Y_train.shape[0], Y_train.shape[1]))
 
     ## Create test dataset
-    X_test, Y_test = create_dataset(test, look_back, look_forward)
+    X_test, Y_test = create_dataset(test, LOOK_BACK, LOOK_FORWARD)
     X_test = np.reshape(X_test, (X_test.shape[0], 1, X_test.shape[1]))
     Y_test = np.reshape(Y_test, (Y_test.shape[0], Y_test.shape[1]))
     #print(X_test.shape)
@@ -133,7 +120,17 @@ def get_dataset(dataframe, variable='B:VIMIN', split_fraction=0.8,concate_axis=1
     return scaler, X_train, Y_train, X_test, Y_test
 
 
-def get_datasets(dataframe,variables = ['B:VIMIN', 'B:IMINER', 'B:LINFRQ', 'I:IB', 'I:MDAT40'],split_fraction=0.8,concate_axis=1):
+def get_datasets(dataframe,variables,
+                 split_fraction=0.8,
+                 concate_axis=1):
+    """
+
+    :param dataframe: Input Dataset
+    :param variables: List of columns
+    :param split_fraction: train-validation split
+    :param concate_axis: axis to concatenate the columns to build arrays
+    :return: list of scaling dicts for each variable, X_train,Y_train,X_test,Y_test
+    """
     data_list = []
     scalers = []
     for v in range(len(variables)):
@@ -145,3 +142,21 @@ def get_datasets(dataframe,variables = ['B:VIMIN', 'B:IMINER', 'B:LINFRQ', 'I:IB
     X_test = np.concatenate((data_list[0][3], data_list[1][3], data_list[2][3], data_list[3][3], data_list[4][3]), axis=concate_axis)
     Y_test = np.concatenate((data_list[0][4], data_list[1][4], data_list[2][4], data_list[3][4], data_list[4][4]), axis=1)
     return scalers,X_train,Y_train,X_test,Y_test
+
+def get_data ( filepath ,
+               nrows: int = 50000 ) :
+    """
+
+    :param filepath: Absolute path to the dataframe
+    :param nrows: Number of rows to be read from the data
+    :return: pandas dataframe
+    """
+    df = load_reformated_csv ( filename = filepath , nrows = nrows )
+    df = df.set_index ( pd.to_datetime ( df.time ) )
+    df = df [VARIABLES]
+    df = df.dropna ( )
+    df = df.drop_duplicates ( )
+    print ( len ( df ) )
+    print ( df.keys ( ) )
+
+    return df
