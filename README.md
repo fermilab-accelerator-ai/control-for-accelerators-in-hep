@@ -1,8 +1,7 @@
 ## How to use the Dockerfile to setup a podman container:
 
-The code in this repository can be used to setup a `podman` image (and container based on the new image).
+**NOTE:** _The code in this repository can be used to setup a `podman` image (and container based on the new image)._
 
-***
 To install the library run the following steps from your terminal:
 
 1. Pull the package from git via `git clone https://github.com/fermilab-accelerator-ai/control-for-accelerators-in-hep.git`. 
@@ -18,7 +17,6 @@ To install the library run the following steps from your terminal:
 
 ## Additional Notes:
 
-***
 * Software requirements remain the same as the previous version of the code. Existing requirements can be viewed in `requirements.txt` and it ought to be used to install any new software packages.
 * The environemnt framework is built of [OpenAI Gym](https://gym.openai.com/)
 * This is a condensed version of the original code and should not be regarded as the final version.
