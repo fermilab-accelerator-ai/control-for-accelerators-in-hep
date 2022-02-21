@@ -25,3 +25,7 @@ To install the library run the following steps from your terminal:
 * Most global variables that are common throughout the directory are present in `globals.py`. To change the variables, a change must be made in their values in this file ONLY.
   * While `data` folder is empty on the repo, you need the file 'data_release.csv' to run the code. The file can be downloaded from [BOOSTR: A Dataset for Accelerator Control Systems (Partial Release 2020)](https://zenodo.org/record/4088982#.YhAB-ZPMJAc)
 ***
+
+## APPENDIX:
+
+_Following variables in the `globals.py` file are used to homogenize the _
