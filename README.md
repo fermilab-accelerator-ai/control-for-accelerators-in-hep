@@ -2,17 +2,25 @@
 
 **NOTE:** _The code in this repository can be used to setup a `podman` image (and container based on the new image)._
 
-To install the library run the following steps from your terminal:
+#### To install the library run the following steps from your terminal:
 
 1. Pull the package from git via `git clone https://github.com/fermilab-accelerator-ai/control-for-accelerators-in-hep.git`. 
 2. If `git` is not setup on the server, clone it to on the local machine and `scp` the folder to the server (provided you have the requisite privileges).
-3. Once the directory is set up run ``podman build -t <IMAGE TAG> -v < ABSOLUTE PATH TO THE DIRECTORY ON THE SYSTEM>:<ABSOLUTE PATH TO THE DIRECTORY IN THE CONTAINER> -f Dockerfile .
+
+#### Build a podman image and container using the following steps:
+
+1. Once the directory is set up run ``podman build -t <IMAGE TAG> -v < ABSOLUTE PATH TO THE DIRECTORY ON THE SYSTEM>:<ABSOLUTE PATH TO THE DIRECTORY IN THE CONTAINER> -f Dockerfile .
 ``
-4. After building the image you can run it using ``podman run -it -v < ABSOLUTE PATH TO THE DIRECTORY ON THE SYSTEM>:<ABSOLUTE PATH TO THE DIRECTORY IN THE CONTAINER>:z <IMAGE TAG>
+2. After building the image you can run it using ``podman run -it -v < ABSOLUTE PATH TO THE DIRECTORY ON THE SYSTEM>:<ABSOLUTE PATH TO THE DIRECTORY IN THE CONTAINER>:z <IMAGE TAG>
 ``
-5. If run successfully, you will see a new prompt, for example, ``[root@6ccffd0f6421 /]#``. Type `ls -l` to view the files in the container env. It'll show you all the files on the local directory as we have bind mount the volume of the container to the local.
-6. Training for the agent can be run using ``python3 run_training.py`` and the results of the training will be stored in the local volume mount.
-7. Container can be exported via ``podman export <CONTAINER ID> > <NAME FOR  THE .TAR.GZ FILE>`` to create a copy for file transfer on the local system.
+3. If run successfully, you will see a new prompt, for example, ``[root@6ccffd0f6421 /]#``. Type `ls -l` to view the files in the container env. It'll show you all the files on the local directory as we have bind mount the volume of the container to the local.
+4. Training for the agent can be run using ``python3 run_training.py`` and the results of the training will be stored in the local volume mount.
+5. Container can be exported via ``podman export <CONTAINER ID> > <NAME FOR  THE .TAR.GZ FILE>`` to create a copy for file transfer on the local system.
+ 
+#### To run a command within an existing container use the following steps:
+
+1. Start the container using `podman start <CONTAINER NAME>`
+2. Execute the command using `podman exec <CONTAINER NAME> <COMMAND>`. For example, `podman execute gmps-ai python3 run_training.py`
 ***
 
 ## Additional Notes:
