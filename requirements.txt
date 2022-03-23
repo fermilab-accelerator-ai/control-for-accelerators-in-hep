@@ -1,0 +1,11 @@
+pandas
+numpy
+matplotlib
+typing
+sklearn
+tensorflow
+keras
+seaborn
+h5py
+gym
+tqdm
