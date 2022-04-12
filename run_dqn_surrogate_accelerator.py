@@ -1,5 +1,3 @@
-import gym
-import time
 import logging
 import csv
 import os
@@ -9,6 +7,15 @@ import tensorflow as tf
 from globals import *
 from tqdm import tqdm
 from datetime import datetime
+import time
+
+import gym
+import gym_accelerators.envs.exabooster_v1, gym_accelerators.envs.surrogate_accelerator_v1
+
+if ENV_TYPE == "continuous":
+    env = gym.make ( 'ExaBooster-v{}'.format ( ENV_VERSION ) )
+else:
+    env = gym.make('Surrogate_Accelerator-v{}'.format(ENV_VERSION))
 
 # Try plaidml
 #os.environ["KERAS_BACKEND"] = "tensorflow.keras.backend"
@@ -53,10 +60,10 @@ def run(episodes:int = 1,
     #     EPISODES = 1
     # Setup environment
     estart = time.time()
-    if ENV_TYPE == "continuous":
-        env = gym.make ( 'gym_accelerators:ExaBooster-v{}'.format ( ENV_VERSION ) )
-    else:
-        env = gym.make('gym_accelerators:Surrogate_Accelerator-v{}'.format(ENV_VERSION))
+#     if ENV_TYPE == "continuous":
+#         env = gym.make ( 'gym_accelerators:ExaBooster-v{}'.format ( ENV_VERSION ) )
+#     else:
+#         env = gym.make('gym_accelerators:Surrogate_Accelerator-v{}'.format(ENV_VERSION))
     env._max_episode_steps = NSTEPS
     env.seed(1)
     end = time.time()
