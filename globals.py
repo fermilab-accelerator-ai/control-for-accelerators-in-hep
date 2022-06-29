@@ -34,7 +34,8 @@ NMODELS = 1
 
 RESULTS_DIR = sys.path[-1] + '/results'
 
-LATEST_SURROGATE_MODEL = sys.path[-1] + '/models/surrogate_models/surrogate_model_version_6/fullbooster_noshift_look_back15_e250_bs99_nsteps250k_invar6_outvar2_axis2_mmscaler_timestampD02102022-T203032_v6_kfold5__final.h5'
+# LATEST_SURROGATE_MODEL = sys.path[-1] + '/models/surrogate_models/surrogate_model_version_6/fullbooster_noshift_look_back15_e250_bs99_nsteps250k_invar6_outvar2_axis2_mmscaler_timestampD02102022-T203032_v6_kfold5__final.h5'
+LATEST_SURROGATE_MODEL = sys.path[-1] + '/models/fullbooster_noshift_look_back15_e250_bs99_nsteps250k_invar6_outvar2_axis2_mmscaler_timestampD02102022-T203032_v6_kfold5__final.h5'
 
 CKPT_FREQ = 20
 
